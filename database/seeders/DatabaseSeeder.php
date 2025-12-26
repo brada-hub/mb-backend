@@ -27,14 +27,14 @@ class DatabaseSeeder extends Seeder
     private function crearSecciones(): void
     {
         $secciones = [
-            ['nombre' => 'Platillos', 'nombre_corto' => 'PLT', 'icono' => 'album', 'color' => '#f59e0b', 'es_viento' => false, 'orden' => 1],
-            ['nombre' => 'Tambores / Tarolas', 'nombre_corto' => 'TAM', 'icono' => 'radio', 'color' => '#ef4444', 'es_viento' => false, 'orden' => 2],
-            ['nombre' => 'Bombos', 'nombre_corto' => 'BOM', 'icono' => 'nightlife', 'color' => '#8b5cf6', 'es_viento' => false, 'orden' => 3],
-            ['nombre' => 'Trompetas', 'nombre_corto' => 'TRP', 'icono' => 'campaign', 'color' => '#3b82f6', 'es_viento' => true, 'orden' => 4],
-            ['nombre' => 'Trombones', 'nombre_corto' => 'TRB', 'icono' => 'music_note', 'color' => '#10b981', 'es_viento' => true, 'orden' => 5],
-            ['nombre' => 'Clarinetes', 'nombre_corto' => 'CLR', 'icono' => 'piano', 'color' => '#ec4899', 'es_viento' => true, 'orden' => 6],
-            ['nombre' => 'Bajos / Barítonos', 'nombre_corto' => 'BAR', 'icono' => 'graphic_eq', 'color' => '#6366f1', 'es_viento' => true, 'orden' => 7],
-            ['nombre' => 'Helicones / Tubas', 'nombre_corto' => 'HEL', 'icono' => 'surround_sound', 'color' => '#14b8a6', 'es_viento' => true, 'orden' => 8],
+            ['nombre' => 'PLATILLOS', 'nombre_corto' => 'PLT', 'icono' => 'album', 'color' => '#f59e0b', 'es_viento' => false, 'orden' => 1],
+            ['nombre' => 'TAMBORES / TAROLAS', 'nombre_corto' => 'TAM', 'icono' => 'radio', 'color' => '#ef4444', 'es_viento' => false, 'orden' => 2],
+            ['nombre' => 'BOMBOS', 'nombre_corto' => 'BOM', 'icono' => 'nightlife', 'color' => '#8b5cf6', 'es_viento' => false, 'orden' => 3],
+            ['nombre' => 'TROMPETAS', 'nombre_corto' => 'TRP', 'icono' => 'campaign', 'color' => '#3b82f6', 'es_viento' => true, 'orden' => 4],
+            ['nombre' => 'TROMBONES', 'nombre_corto' => 'TRB', 'icono' => 'music_note', 'color' => '#10b981', 'es_viento' => true, 'orden' => 5],
+            ['nombre' => 'CLARINETES', 'nombre_corto' => 'CLR', 'icono' => 'piano', 'color' => '#ec4899', 'es_viento' => true, 'orden' => 6],
+            ['nombre' => 'BAJOS / BARÍTONOS', 'nombre_corto' => 'BAR', 'icono' => 'graphic_eq', 'color' => '#6366f1', 'es_viento' => true, 'orden' => 7],
+            ['nombre' => 'HELICONES / TUBAS', 'nombre_corto' => 'HEL', 'icono' => 'surround_sound', 'color' => '#14b8a6', 'es_viento' => true, 'orden' => 8],
         ];
 
         foreach ($secciones as $seccion) {
@@ -45,9 +45,9 @@ class DatabaseSeeder extends Seeder
     private function crearCategoriasSalariales(): void
     {
         $categorias = [
-            ['codigo' => 'A', 'nombre' => 'Categoría A', 'descripcion' => 'Músicos con mayor experiencia y responsabilidad', 'monto_base' => 200, 'orden' => 1],
-            ['codigo' => 'B', 'nombre' => 'Categoría B', 'descripcion' => 'Músicos con experiencia intermedia', 'monto_base' => 150, 'orden' => 2],
-            ['codigo' => 'C', 'nombre' => 'Categoría C', 'descripcion' => 'Músicos nuevos o en formación', 'monto_base' => 100, 'orden' => 3],
+            ['codigo' => 'A', 'nombre' => 'CATEGORÍA A', 'descripcion' => 'MÚSICOS CON MAYOR EXPERIENCIA Y RESPONSABILIDAD', 'monto_base' => 200, 'orden' => 1],
+            ['codigo' => 'B', 'nombre' => 'CATEGORÍA B', 'descripcion' => 'MÚSICOS CON EXPERIENCIA INTERMEDIA', 'monto_base' => 150, 'orden' => 2],
+            ['codigo' => 'C', 'nombre' => 'CATEGORÍA C', 'descripcion' => 'MÚSICOS NUEVOS O EN FORMACIÓN', 'monto_base' => 100, 'orden' => 3],
         ];
 
         foreach ($categorias as $categoria) {
@@ -59,10 +59,10 @@ class DatabaseSeeder extends Seeder
     {
         // Crear roles
         $roles = [
-            ['nombre' => 'Super Administrador', 'slug' => 'super_admin', 'descripcion' => 'Control total del sistema', 'nivel' => 100],
-            ['nombre' => 'Director', 'slug' => 'director', 'descripcion' => 'Director de la banda', 'nivel' => 80],
-            ['nombre' => 'Jefe de Sección', 'slug' => 'jefe_seccion', 'descripcion' => 'Jefe de una sección musical', 'nivel' => 50],
-            ['nombre' => 'Miembro', 'slug' => 'miembro', 'descripcion' => 'Músico de la banda', 'nivel' => 10],
+            ['nombre' => 'SUPER ADMINISTRADOR', 'slug' => 'super_admin', 'descripcion' => 'CONTROL TOTAL DEL SISTEMA', 'nivel' => 100],
+            ['nombre' => 'DIRECTOR', 'slug' => 'director', 'descripcion' => 'DIRECTOR DE LA BANDA', 'nivel' => 80],
+            ['nombre' => 'JEFE DE SECCIÓN', 'slug' => 'jefe_seccion', 'descripcion' => 'JEFE DE UNA SECCIÓN MUSICAL', 'nivel' => 50],
+            ['nombre' => 'MIEMBRO', 'slug' => 'miembro', 'descripcion' => 'MÚSICO DE LA BANDA', 'nivel' => 10],
         ];
 
         foreach ($roles as $rol) {
@@ -71,21 +71,25 @@ class DatabaseSeeder extends Seeder
 
         // Crear permisos
         $modulos = [
-            'miembros' => ['ver', 'crear', 'editar', 'eliminar'],
-            'eventos' => ['ver', 'crear', 'editar', 'eliminar'],
-            'asistencias' => ['ver', 'registrar', 'editar'],
-            'partituras' => ['ver', 'subir', 'eliminar'],
-            'pagos' => ['ver', 'crear', 'editar', 'anular'],
-            'reportes' => ['ver', 'exportar'],
-            'configuracion' => ['ver', 'editar'],
+            'MIEMBROS' => ['VER', 'CREAR', 'EDITAR', 'ELIMINAR'],
+            'EVENTOS' => ['VER', 'CREAR', 'EDITAR', 'ELIMINAR'],
+            'ASISTENCIAS' => ['VER', 'REGISTRAR', 'EDITAR'],
+            'PARTITURAS' => ['VER', 'SUBIR', 'ELIMINAR'],
+            'PAGOS' => ['VER', 'CREAR', 'EDITAR', 'ANULAR'],
+            'REPORTES' => ['VER', 'EXPORTAR'],
+            'CONFIGURACION' => ['VER', 'EDITAR'],
         ];
 
         foreach ($modulos as $modulo => $acciones) {
             foreach ($acciones as $accion) {
+                // Generar slugs en minúsculas para uso interno, pero nombres visibles en mayúsculas
+                $slugModulo = strtolower($modulo);
+                $slugAccion = strtolower($accion);
+
                 Permiso::create([
-                    'modulo' => $modulo,
-                    'accion' => $accion,
-                    'nombre' => ucfirst($accion) . ' ' . $modulo,
+                    'modulo' => $slugModulo,
+                    'accion' => $slugAccion,
+                    'nombre' => $accion . ' ' . $modulo,
                 ]);
             }
         }
@@ -142,16 +146,16 @@ class DatabaseSeeder extends Seeder
     private function crearGenerosMusicales(): void
     {
         $generos = [
-            ['nombre' => 'Morenada', 'icono' => 'music_note', 'color' => '#dc2626', 'orden' => 1],
-            ['nombre' => 'Diablada', 'icono' => 'whatshot', 'color' => '#f97316', 'orden' => 2],
-            ['nombre' => 'Caporales', 'icono' => 'celebration', 'color' => '#eab308', 'orden' => 3],
-            ['nombre' => 'Tinkus', 'icono' => 'accessibility_new', 'color' => '#22c55e', 'orden' => 4],
-            ['nombre' => 'Salay', 'icono' => 'nightlife', 'color' => '#3b82f6', 'orden' => 5],
-            ['nombre' => 'Tobas', 'icono' => 'forest', 'color' => '#8b5cf6', 'orden' => 6],
-            ['nombre' => 'Llamerada', 'icono' => 'pets', 'color' => '#ec4899', 'orden' => 7],
-            ['nombre' => 'Saya', 'icono' => 'groups', 'color' => '#14b8a6', 'orden' => 8],
-            ['nombre' => 'Waca Waca', 'icono' => 'agriculture', 'color' => '#f59e0b', 'orden' => 9],
-            ['nombre' => 'Pujllay', 'icono' => 'mood', 'color' => '#6366f1', 'orden' => 10],
+            ['nombre' => 'MORENADA', 'icono' => 'music_note', 'color' => '#dc2626', 'orden' => 1],
+            ['nombre' => 'DIABLADA', 'icono' => 'whatshot', 'color' => '#f97316', 'orden' => 2],
+            ['nombre' => 'CAPORALES', 'icono' => 'celebration', 'color' => '#eab308', 'orden' => 3],
+            ['nombre' => 'TINKUS', 'icono' => 'accessibility_new', 'color' => '#22c55e', 'orden' => 4],
+            ['nombre' => 'SALAY', 'icono' => 'nightlife', 'color' => '#3b82f6', 'orden' => 5],
+            ['nombre' => 'TOBAS', 'icono' => 'forest', 'color' => '#8b5cf6', 'orden' => 6],
+            ['nombre' => 'LLAMERADA', 'icono' => 'pets', 'color' => '#ec4899', 'orden' => 7],
+            ['nombre' => 'SAYA', 'icono' => 'groups', 'color' => '#14b8a6', 'orden' => 8],
+            ['nombre' => 'WACA WACA', 'icono' => 'agriculture', 'color' => '#f59e0b', 'orden' => 9],
+            ['nombre' => 'PUJLLAY', 'icono' => 'mood', 'color' => '#6366f1', 'orden' => 10],
         ];
 
         foreach ($generos as $genero) {
@@ -180,8 +184,8 @@ class DatabaseSeeder extends Seeder
         // 3. Crear Perfil de Miembro
         Miembro::create([
             'user_id' => $user->id,
-            'nombres' => 'Administrador',
-            'apellidos' => 'Sistema',
+            'nombres' => 'ADMINISTRADOR',
+            'apellidos' => 'SISTEMA',
             'ci_numero' => '0000001',
             'ci_complemento' => null,
             'celular' => 70000000,

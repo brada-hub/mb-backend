@@ -30,8 +30,8 @@ return new class extends Migration
             // Unique compuesto opcional, pero mejor manejarlo en lógica o con un índice
             $table->unique(['ci_numero', 'ci_complemento']);
 
-            // Celular (Integer 8 dígitos)
-            $table->integer('celular');
+            // Celular (Integer 8 dígitos) - Único
+            $table->integer('celular')->unique();
 
             $table->date('fecha_nacimiento')->nullable();
             $table->string('foto')->nullable();

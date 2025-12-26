@@ -109,7 +109,7 @@ class MiembroController extends Controller
             'nombres' => 'required|string|max:30',
             'apellidos' => 'required|string|max:30',
             'ci' => 'required|string|max:12', // Max 12 chars
-            'celular' => ['required', 'regex:/^[67]\d{7}$/'],
+            'celular' => ['required', 'regex:/^[67]\d{7}$/', 'unique:miembros,celular'],
             'fecha_nacimiento' => 'required|date|before:today',
             'direccion' => 'nullable|string',
             'latitud' => 'nullable|numeric',
@@ -155,20 +155,20 @@ class MiembroController extends Controller
             // 4. Crear Miembro
             $miembro = Miembro::create([
                 'user_id' => $user->id,
-                'nombres' => $request->nombres,
-                'apellidos' => $request->apellidos,
+                'nombres' => mb_strtoupper($request->nombres),
+                'apellidos' => mb_strtoupper($request->apellidos),
                 'ci_numero' => $ciNumero,
-                'ci_complemento' => $ciComplemento,
+                'ci_complemento' => $ciComplemento ? strtoupper($ciComplemento) : null,
                 'celular' => (int) $request->celular,
                 'fecha_nacimiento' => $request->fecha_nacimiento,
-                'direccion' => $request->direccion,
+                'direccion' => mb_strtoupper($request->direccion),
                 'latitud' => $request->latitud,
                 'longitud' => $request->longitud,
-                'referencia_nombre' => $request->referencia_nombre,
+                'referencia_nombre' => mb_strtoupper($request->referencia_nombre),
                 'referencia_celular' => $request->referencia_celular,
                 'seccion_id' => $request->seccion_id,
                 'categoria_id' => $request->categoria_id,
-                'notas' => $request->notas,
+                'notas' => mb_strtoupper($request->notas),
             ]);
 
             $miembro->load(['seccion', 'categoria', 'user.roles']);
@@ -198,7 +198,7 @@ class MiembroController extends Controller
             'nombres' => 'sometimes|string|max:30',
             'apellidos' => 'sometimes|string|max:30',
             'ci' => 'sometimes|string|max:12',
-            'celular' => ['sometimes', 'regex:/^[67]\d{7}$/'],
+            'celular' => ['sometimes', 'regex:/^[67]\d{7}$/', 'unique:miembros,celular,' . $miembro->id],
             'fecha_nacimiento' => 'sometimes|nullable|date|before:today',
             'referencia_nombre' => ['sometimes', 'nullable', 'string', 'max:100', 'regex:/^[\pL\s]+$/u'],
             'referencia_celular' => ['sometimes', 'nullable', 'regex:/^[67]\d{7}$/'],
@@ -212,10 +212,17 @@ class MiembroController extends Controller
             // Actualizar datos de Miembro
             $data = $request->except(['rol_id', 'activo', 'ci']);
 
+            // Transformar a mayúsculas
+            foreach (['nombres', 'apellidos', 'direccion', 'referencia_nombre', 'notas'] as $field) {
+                if (isset($data[$field])) {
+                    $data[$field] = mb_strtoupper($data[$field]);
+                }
+            }
+
             if ($request->has('ci')) {
                 $ciParts = explode('-', $request->ci);
                 $ciNumero = $ciParts[0];
-                $ciComplemento = isset($ciParts[1]) ? substr($ciParts[1], 0, 5) : null;
+                $ciComplemento = isset($ciParts[1]) ? strtoupper(substr($ciParts[1], 0, 5)) : null;
 
                 // Validar unicidad (excluyendo actual)
                 $existe = Miembro::where('ci_numero', $ciNumero)
