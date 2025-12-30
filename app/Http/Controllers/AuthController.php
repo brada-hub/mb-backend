@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
+use App\Http\Requests\LoginRequest;
 use App\Models\User;
 use App\Models\DispositivoAutorizado;
 use Illuminate\Support\Facades\Hash;
@@ -10,42 +11,50 @@ use Illuminate\Support\Facades\Auth;
 
 class AuthController extends Controller
 {
-    public function login(Request $request)
+    public function login(LoginRequest $request) // Changed Request to LoginRequest
     {
-        $request->validate([
-            'user' => 'required',
-            'password' => 'required',
-            'uuid_celular' => 'nullable' // For device check on login
-        ]);
+        $user = User::with('miembro.rol')->where('user', $request->user)->first(); // Modified user retrieval
 
-        $user = User::where('user', $request->user)->first();
-
+        // 1. Basic Auth Check
         if (!$user || !Hash::check($request->password, $user->password)) {
             return response()->json(['message' => 'Credenciales incorrectas'], 401);
         }
 
-        if (!$user->estado) {
-            return response()->json(['message' => 'Usuario inactivo'], 403);
+        if (!$user->estado) return response()->json(['message' => 'Usuario inactivo'], 403);
+
+        // 2. Role Discrimination (Portal vs App)
+        $roleName = $user->miembro->rol->rol ?? 'Desconocido';
+
+        if ($request->platform === 'web' && $roleName !== 'Director' && $roleName !== 'Admin') {
+            return response()->json(['message' => 'Acceso denegado: Solo Directores pueden acceder al Panel Web.'], 403);
         }
 
-        // Optional: Device Bonding Check
-        if ($request->uuid_celular) {
-            $device = DispositivoAutorizado::where('uuid_celular', $request->uuid_celular)
-                        ->where('id_user', $user->id_user)
-                        ->first();
+        // 3. Device Bonding (Only for Mobile)
+        if ($request->platform === 'mobile' && $request->uuid_celular) {
+            $device = DispositivoAutorizado::where('id_user', $user->id_user)->first(); // Assuming 1 device per user for strict mode
 
-            if (!$device) {
-                 // Or auto-register based on logic
-                 // return response()->json(['message' => 'Dispositivo no autorizado'], 403);
+            if ($device) {
+                // If device registered, match UUID
+                if ($device->uuid_celular !== $request->uuid_celular && $device->estado) {
+                    return response()->json(['message' => 'Este usuario está vinculado a otro dispositivo. Contacte al Director.'], 403);
+                }
+            } else {
+                // Auto-register first device (Bonding)
+                DispositivoAutorizado::create([
+                    'id_user' => $user->id_user,
+                    'uuid_celular' => $request->uuid_celular,
+                    'nombre_modelo' => $request->device_model ?? 'Desconocido'
+                ]);
             }
         }
 
-        $token = $user->createToken('auth-token')->plainTextToken;
+        $token = $user->createToken($request->platform . '-token')->plainTextToken; // Modified token name
 
         return response()->json([
             'token' => $token,
-            'id_miembro' => $user->id_miembro,
-            'user' => $user
+            'user' => $user, // Modified response structure
+            'role' => $roleName,
+            'permissions' => [] // Load permissions logic here
         ]);
     }
 

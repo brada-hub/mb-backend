@@ -13,7 +13,7 @@ return new class extends Migration
     {
         Schema::create('dispositivos_autorizados', function (Blueprint $table) {
             $table->id('id_dispositivo');
-            $table->foreignId('id_user')->constrained('users')->onDelete('cascade');
+            $table->foreignId('id_user')->constrained('users', 'id_user')->onDelete('cascade');
             $table->string('uuid_celular');
             $table->string('nombre_modelo');
             $table->timestamp('fecha_registro')->useCurrent();

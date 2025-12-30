@@ -12,10 +12,9 @@ return new class extends Migration
     public function up(): void
     {
         Schema::table('users', function (Blueprint $table) {
-            $table->foreignId('id_miembro')->nullable()->constrained('miembros', 'id_miembro');
-            $table->string('user')->unique()->nullable();
-            $table->boolean('estado')->default(true);
-            $table->text('token')->nullable();
+            if (!Schema::hasColumn('users', 'id_miembro')) {
+                $table->foreignId('id_miembro')->nullable()->constrained('miembros', 'id_miembro');
+            }
         });
     }
 
@@ -25,7 +24,8 @@ return new class extends Migration
     public function down(): void
     {
         Schema::table('users', function (Blueprint $table) {
-            //
+            $table->dropForeign(['id_miembro']);
+            $table->dropColumn('id_miembro');
         });
     }
 };

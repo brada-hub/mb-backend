@@ -2,8 +2,10 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\Miembro;
 use Illuminate\Http\Request;
+use App\Http\Requests\StoreMiembroRequest;
+use App\Models\Miembro;
+use App\Models\User;
 
 class MiembroController extends Controller
 {
@@ -18,21 +20,36 @@ class MiembroController extends Controller
     /**
      * Store a newly created resource in storage.
      */
-    public function store(Request $request)
+    public function store(StoreMiembroRequest $request)
     {
-        $validated = $request->validate([
-            'id_categoria' => 'required|exists:categorias,id_categoria',
-            'nombres' => 'required|string|max:50',
-            'apellidos' => 'required|string|max:50',
-            'ci' => 'required|string|unique:miembros,ci',
-            'celular' => 'required|integer',
-            'fecha' => 'nullable|date',
-            'id_seccion' => 'required|exists:secciones,id_seccion',
-            'id_rol' => 'required|exists:roles,id_rol',
-        ]);
+        return \DB::transaction(function () use ($request) {
+            // 1. Create Miembro (Expediente)
+            $miembro = Miembro::create($request->only([
+                'id_categoria', 'id_seccion', 'id_rol', 'nombres', 'apellidos',
+                'ci', 'celular', 'fecha', 'latitud', 'longitud', 'direccion'
+            ]));
 
-        $miembro = Miembro::create($validated);
-        return response()->json($miembro, 201);
+            // 2. Create User Login (if requested)
+            if ($request->create_user) {
+                User::create([
+                    'user' => $request->username,
+                    'password' => \Hash::make($request->password), // Password hashed
+                    'id_miembro' => $miembro->id_miembro,
+                    'estado' => true
+                ]);
+            }
+
+            // 3. Create Contacto de Emergencia (if data exists)
+            if ($request->filled('contacto_nombre')) {
+                $miembro->contactos()->create([
+                    'nombres_apellidos' => $request->contacto_nombre,
+                    'parentesco' => $request->contacto_parentesco,
+                    'celular' => $request->contacto_celular
+                ]);
+            }
+
+            return response()->json($miembro->load('user', 'contactos'), 201);
+        });
     }
 
     /**
