@@ -54,4 +54,11 @@ class Miembro extends Model
     {
         return $this->hasMany(Asistencia::class, 'id_miembro');
     }
+
+    public function permisos()
+    {
+        return $this->belongsToMany(Permiso::class, 'miembro_permiso', 'id_miembro', 'id_permiso')
+                    ->withPivot('estado_booleano')
+                    ->withTimestamps();
+    }
 }

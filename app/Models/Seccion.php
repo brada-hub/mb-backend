@@ -10,5 +10,11 @@ class Seccion extends Model
     use HasFactory;
     protected $table = 'secciones';
     protected $primaryKey = 'id_seccion';
-    protected $fillable = ['seccion', 'descripcion'];
+    protected $fillable = ['seccion', 'descripcion', 'estado'];
+    protected $casts = ['estado' => 'boolean'];
+
+    public function miembros()
+    {
+        return $this->hasMany(Miembro::class, 'id_seccion', 'id_seccion');
+    }
 }

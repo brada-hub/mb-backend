@@ -25,8 +25,8 @@ class AuthController extends Controller
         // 2. Role Discrimination (Portal vs App)
         $roleName = $user->miembro->rol->rol ?? 'Desconocido';
 
-        if ($request->platform === 'web' && $roleName !== 'Director' && $roleName !== 'Admin') {
-            return response()->json(['message' => 'Acceso denegado: Solo Directores pueden acceder al Panel Web.'], 403);
+        if ($request->platform === 'web' && !$user->id_miembro) {
+            return response()->json(['message' => 'Acceso denegado: Este usuario no tiene un perfil de miembro asociado.'], 403);
         }
 
         // 3. Device Bonding (Only for Mobile)
@@ -50,11 +50,17 @@ class AuthController extends Controller
 
         $token = $user->createToken($request->platform . '-token')->plainTextToken; // Modified token name
 
+        // 4. Permissions Logic
+        $rolePerms = $user->miembro->rol->permisos->pluck('permiso')->toArray();
+        $customPerms = $user->miembro->permisos->pluck('permiso')->toArray();
+        $allPermissions = array_unique(array_merge($rolePerms, $customPerms));
+
         return response()->json([
             'token' => $token,
-            'user' => $user, // Modified response structure
+            'user' => $user->load('miembro.rol', 'miembro.permisos'),
             'role' => $roleName,
-            'permissions' => [] // Load permissions logic here
+            'permissions' => $allPermissions,
+            'password_changed' => $user->password_changed
         ]);
     }
 
@@ -84,7 +90,18 @@ class AuthController extends Controller
 
     public function profile(Request $request)
     {
-        return response()->json($request->user()->load('miembro.rol', 'miembro.seccion'));
+        $user = $request->user()->load('miembro.rol.permisos', 'miembro.permisos', 'miembro.seccion');
+
+        $rolePerms = $user->miembro->rol->permisos->pluck('permiso')->toArray();
+        $customPerms = $user->miembro->permisos->pluck('permiso')->toArray();
+        $allPermissions = array_unique(array_merge($rolePerms, $customPerms));
+
+        return response()->json([
+            'user' => $user,
+            'role' => $user->miembro->rol->rol,
+            'permissions' => $allPermissions,
+            'password_changed' => $user->password_changed
+        ]);
     }
 
     public function syncVersions()
@@ -97,6 +114,21 @@ class AuthController extends Controller
         ]);
     }
 
+    public function changePassword(Request $request)
+    {
+        $request->validate([
+            'password' => 'required|string|min:8|confirmed',
+        ]);
+
+        $user = $request->user();
+        $user->update([
+            'password' => Hash::make($request->password),
+            'password_changed' => true
+        ]);
+
+        return response()->json(['message' => 'Contraseña actualizada correctamente']);
+    }
+
     public function syncMasterData()
     {
         // Return all small catalogs
@@ -104,6 +136,7 @@ class AuthController extends Controller
             'roles' => \App\Models\Rol::all(),
             'secciones' => \App\Models\Seccion::all(),
             'categorias' => \App\Models\Categoria::all(),
+            'permisos' => \App\Models\Permiso::all(),
              // ... others
         ]);
     }

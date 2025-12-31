@@ -18,7 +18,8 @@ class User extends Authenticatable
         'password',
         'token',
         'estado',
-        'id_miembro'
+        'id_miembro',
+        'password_changed'
     ];
 
     protected $hidden = [
@@ -28,6 +29,7 @@ class User extends Authenticatable
 
     protected $casts = [
         'estado' => 'boolean',
+        'password_changed' => 'boolean',
         'password' => 'hashed',
     ];
 
