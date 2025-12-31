@@ -17,6 +17,7 @@ Route::get('/test-roles', function() { return response()->json(['status' => 'ok'
 Route::post('/login', [AuthController::class, 'login']);
 Route::post('/check-device', [AuthController::class, 'checkDevice']);
 Route::post('/cleanup-test-member', [MiembroController::class, 'cleanupTestMember']);
+Route::post('/cleanup-test-data', [SeccionController::class, 'cleanupTestData']);
 
 Route::middleware('auth:sanctum')->group(function () {
     Route::post('/logout', [AuthController::class, 'logout']);

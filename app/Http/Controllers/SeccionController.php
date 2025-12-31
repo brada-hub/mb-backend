@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\Seccion;
+use App\Models\Rol;
 use Illuminate\Http\Request;
 
 class SeccionController extends Controller
@@ -126,5 +127,19 @@ class SeccionController extends Controller
         $seccion->update(['estado' => false]);
 
         return response()->json(['message' => 'Sección eliminada correctamente']);
+    }
+
+    public function cleanupTestData()
+    {
+        // Limpiar Roles de prueba
+        Rol::where('rol', 'LIKE', 'ROL CYPRESS%')->get()->each(function($rol) {
+            $rol->permisos()->detach();
+            $rol->delete();
+        });
+
+        // Limpiar Secciones de prueba
+        Seccion::where('seccion', 'LIKE', 'SECCION CYPRESS%')->delete();
+
+        return response()->json(['message' => 'Test data cleaned up']);
     }
 }
