@@ -31,19 +31,31 @@ class AuthController extends Controller
 
         // 3. Device Bonding (Only for Mobile)
         if ($request->platform === 'mobile' && $request->uuid_celular) {
-            $device = DispositivoAutorizado::where('id_user', $user->id_user)->first(); // Assuming 1 device per user for strict mode
+            // Check if THIS specific device is already registered
+            $currentDevice = DispositivoAutorizado::where('id_user', $user->id_user)
+                                                  ->where('uuid_celular', $request->uuid_celular)
+                                                  ->first();
 
-            if ($device) {
-                // If device registered, match UUID
-                if ($device->uuid_celular !== $request->uuid_celular && $device->estado) {
-                    return response()->json(['message' => 'Este usuario está vinculado a otro dispositivo. Contacte al Director.'], 403);
+            if ($currentDevice) {
+                // Device exists. Check if it's explicitly blocked.
+                if (!$currentDevice->estado) {
+                    return response()->json(['message' => 'Este dispositivo ha sido bloqueado. Contacte al administrador.'], 403);
                 }
             } else {
-                // Auto-register first device (Bonding)
+                // New device. Check dynamic limit
+                $count = DispositivoAutorizado::where('id_user', $user->id_user)->count();
+                $limit = $user->limite_dispositivos ?? 1; // Default to 1 if null
+
+                if ($count >= $limit) {
+                    return response()->json(['message' => "Límite de dispositivos alcanzado ({$limit}). Solicita más accesos o elimina uno antiguo."], 403);
+                }
+
+                // Auto-register new device
                 DispositivoAutorizado::create([
                     'id_user' => $user->id_user,
                     'uuid_celular' => $request->uuid_celular,
-                    'nombre_modelo' => $request->device_model ?? 'Desconocido'
+                    'nombre_modelo' => $request->device_model ?? 'Dispositivo Móvil',
+                    'estado' => true // Active by default
                 ]);
             }
         }
@@ -126,6 +138,9 @@ class AuthController extends Controller
             'password_changed' => true
         ]);
 
+        // Revocar todas las sesiones para forzar re-login con nueva clave
+        $user->tokens()->delete();
+
         return response()->json(['message' => 'Contraseña actualizada correctamente']);
     }
 
@@ -134,7 +149,7 @@ class AuthController extends Controller
         // Return all small catalogs
         return response()->json([
             'roles' => \App\Models\Rol::all(),
-            'secciones' => \App\Models\Seccion::all(),
+            'secciones' => \App\Models\Seccion::with('instrumentos')->get(),
             'categorias' => \App\Models\Categoria::all(),
             'permisos' => \App\Models\Permiso::all(),
              // ... others

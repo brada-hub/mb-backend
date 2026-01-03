@@ -7,6 +7,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use App\Models\Rol;
 use App\Models\Seccion;
+use App\Models\Instrumento;
 use App\Models\Categoria;
 use App\Models\User;
 use App\Models\Miembro;
@@ -21,15 +22,45 @@ class InitialCatalogSeeder extends Seeder
         $jefeRole = Rol::create(['rol' => 'JEFE DE SECCION', 'descripcion' => 'ENCARGADO DE UNA SECCIÓN']);
         $miembroRole = Rol::create(['rol' => 'MIEMBRO', 'descripcion' => 'INTEGRANTE DE LA BANDA']);
 
-        // 2. Secciones
-        Seccion::create(['seccion' => 'PLATILLOS', 'descripcion' => 'SECCIÓN DE PERCUSIÓN']);
-        Seccion::create(['seccion' => 'TAMBOR', 'descripcion' => 'SECCIÓN DE PERCUSIÓN']);
-        Seccion::create(['seccion' => 'BOMBO', 'descripcion' => 'SECCIÓN DE PERCUSIÓN']);
-        Seccion::create(['seccion' => 'TROMBON', 'descripcion' => 'SECCIÓN DE VIENTOS METAL']);
-        Seccion::create(['seccion' => 'CLARINETE', 'descripcion' => 'SECCIÓN DE VIENTOS MADERA']);
-        Seccion::create(['seccion' => 'BAJO', 'descripcion' => 'SECCIÓN DE CUERDAS GRAVES']);
-        Seccion::create(['seccion' => 'TROMPETA', 'descripcion' => 'SECCIÓN DE VIENTOS METAL']);
-        Seccion::create(['seccion' => 'HELICON', 'descripcion' => 'SECCIÓN DE CUERDAS GRAVES']);
+        // 2. Secciones e Instrumentos
+        // Estructura: 'NOMBRE_SECCION' => ['Instr1', 'Instr2', ...]
+        $catalog = [
+            'PERCUSIÓN' => ['PLATILLO', 'TAMBOR', 'BOMBO'],
+            'METALES' => ['TROMPETA', 'TROMBÓN', 'BARÍTONO', 'HELICÓN'],
+            'MADERAS' => ['CLARINETE']
+        ];
+
+        // Guardamos referencias para asignar al admin después
+        $trompetaId = null;
+
+        foreach ($catalog as $secName => $instruments) {
+            $seccion = Seccion::create([
+                'seccion' => $secName,
+                'descripcion' => 'SECCIÓN DE ' . $secName,
+                'estado' => true // Default active
+            ]);
+
+            foreach ($instruments as $instName) {
+                $inst = Instrumento::create([
+                    'instrumento' => $instName,
+                    'id_seccion' => $seccion->id_seccion
+                ]);
+
+                if ($instName === 'TROMPETA') {
+                    $trompetaId = $inst->id_instrumento;
+                }
+            }
+        }
+
+        // Fallback por si no se creó trompeta
+        if (!$trompetaId) {
+            $firstInst = Instrumento::first();
+            $trompetaId = $firstInst ? $firstInst->id_instrumento : null;
+        }
+
+        $trompetaInst = Instrumento::find($trompetaId);
+        $trompetaSeccionId = $trompetaInst ? $trompetaInst->id_seccion : 1;
+
 
         // 3. Categorías
         $catA = Categoria::create(['nombre_categoria' => 'A', 'descripcion' => 'NIVEL EXPERTO']);
@@ -38,7 +69,8 @@ class InitialCatalogSeeder extends Seeder
         // 4. Create initial Admin Member & User
         $adminMiembro = Miembro::create([
             'id_categoria' => $catA->id_categoria,
-            'id_seccion' => 7, // TROMPETA
+            'id_seccion' => $trompetaSeccionId,
+            'id_instrumento' => $trompetaId,
             'id_rol' => $adminRole->id_rol,
             'nombres' => 'ADMIN',
             'apellidos' => 'MONSTER',
@@ -58,7 +90,8 @@ class InitialCatalogSeeder extends Seeder
         // Director for web testing
         $directorMiembro = Miembro::create([
             'id_categoria' => $catA->id_categoria,
-            'id_seccion' => 7, // TROMPETA
+            'id_seccion' => $trompetaSeccionId,
+            'id_instrumento' => $trompetaId,
             'id_rol' => $directorRole->id_rol,
             'nombres' => 'DIRECTOR',
             'apellidos' => 'GENERAL',

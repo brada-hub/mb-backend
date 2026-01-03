@@ -11,8 +11,8 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::table('secciones', function (Blueprint $table) {
-            $table->boolean('estado')->default(true)->after('descripcion');
+        Schema::table('users', function (Blueprint $table) {
+            $table->integer('limite_dispositivos')->default(1);
         });
     }
 
@@ -21,8 +21,8 @@ return new class extends Migration
      */
     public function down(): void
     {
-        Schema::table('secciones', function (Blueprint $table) {
-            $table->dropColumn('estado');
+        Schema::table('users', function (Blueprint $table) {
+            $table->dropColumn('limite_dispositivos');
         });
     }
 };

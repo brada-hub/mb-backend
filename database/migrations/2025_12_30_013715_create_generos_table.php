@@ -15,6 +15,8 @@ return new class extends Migration
             $table->id('id_genero');
             $table->string('nombre_genero');
             $table->string('banner_opcional')->nullable();
+            $table->string('color_primario')->default('#4f46e5');
+            $table->string('color_secundario')->default('#ec4899');
             $table->timestamps();
         });
     }

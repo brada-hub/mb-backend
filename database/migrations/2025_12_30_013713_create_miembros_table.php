@@ -24,8 +24,16 @@ return new class extends Migration
             $table->decimal('latitud', 10, 8)->nullable();
             $table->decimal('longitud', 11, 8)->nullable();
             $table->string('direccion')->nullable();
+            $table->unsignedBigInteger('id_instrumento')->nullable(); // Nueva estructura
             $table->integer('version_perfil')->default(1); // Offline sync field
             $table->timestamps();
+
+            $table->foreign('id_instrumento')->references('id_instrumento')->on('instrumentos')->onDelete('set null');
+        });
+
+        // Ahora que miembros existe, conectamos users
+        Schema::table('users', function (Blueprint $table) {
+            $table->foreign('id_miembro')->references('id_miembro')->on('miembros')->onDelete('set null');
         });
     }
 
@@ -34,6 +42,9 @@ return new class extends Migration
      */
     public function down(): void
     {
+        Schema::table('users', function (Blueprint $table) {
+            $table->dropForeign(['id_miembro']);
+        });
         Schema::dropIfExists('miembros');
     }
 };

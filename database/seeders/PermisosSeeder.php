@@ -19,6 +19,7 @@ class PermisosSeeder extends Seeder
             'GESTION_FINANZAS',
             'GESTION_RECURSOS',
             'GESTION_SECCIONES',
+            'GESTION_BIBLIOTECA',
         ];
 
         foreach ($permisos as $p) {
@@ -50,7 +51,8 @@ class PermisosSeeder extends Seeder
         $miembro = Rol::where('rol', 'MIEMBRO')->first();
         if ($miembro) {
             $miembro->permisos()->sync(Permiso::whereIn('permiso', [
-                'VER_DASHBOARD'
+                'VER_DASHBOARD',
+                'GESTION_BIBLIOTECA'
             ])->pluck('id_permiso'));
         }
     }

@@ -65,6 +65,7 @@ class StoreMiembroRequest extends FormRequest
             'direccion' => [$sometimes . 'required', 'string', 'min:10', 'max:200', 'regex:/^[a-zA-ZñÑáéíóúÁÉÍÓÚüÜ0-9\s.,#\-\/]+$/'],
             'id_categoria' => [$sometimes . 'required', 'integer', 'exists:categorias,id_categoria'],
             'id_seccion' => [$sometimes . 'required', 'integer', 'exists:secciones,id_seccion'],
+            'id_instrumento' => 'nullable|integer|exists:instrumentos,id_instrumento',
             'id_rol' => [$sometimes . 'required', 'integer', 'exists:roles,id_rol'],
             'has_emergency_contact' => 'nullable|boolean',
             'contacto_nombre' => ['nullable', 'required_if:has_emergency_contact,true', 'string', 'min:3', 'max:100', 'regex:/^[a-zA-ZñÑáéíóúÁÉÍÓÚüÜ\s]+$/'],

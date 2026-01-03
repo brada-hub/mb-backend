@@ -8,6 +8,7 @@ use App\Http\Requests\StoreMiembroRequest;
 use App\Http\Requests\UpdateMiembroRequest;
 use App\Models\Miembro;
 use App\Models\User;
+use App\Models\DispositivoAutorizado;
 
 class MiembroController extends Controller
 {
@@ -16,7 +17,7 @@ class MiembroController extends Controller
      */
     public function index()
     {
-        return Miembro::with(['categoria', 'seccion', 'rol.permisos', 'user', 'contactos', 'permisos'])->get();
+        return Miembro::with(['categoria', 'seccion', 'instrumento', 'rol.permisos', 'user', 'contactos', 'permisos'])->get();
     }
 
     /**
@@ -27,7 +28,7 @@ class MiembroController extends Controller
         return \DB::transaction(function () use ($request) {
             // 1. Create Miembro (Expediente)
             $miembro = Miembro::create($request->only([
-                'id_categoria', 'id_seccion', 'id_rol', 'nombres', 'apellidos',
+                'id_categoria', 'id_seccion', 'id_instrumento', 'id_rol', 'nombres', 'apellidos',
                 'ci', 'celular', 'fecha', 'latitud', 'longitud', 'direccion'
             ]));
 
@@ -89,7 +90,7 @@ class MiembroController extends Controller
         $miembro = Miembro::findOrFail($id);
 
         $miembro->update($request->only([
-            'id_categoria', 'id_seccion', 'id_rol', 'nombres', 'apellidos',
+            'id_categoria', 'id_seccion', 'id_instrumento', 'id_rol', 'nombres', 'apellidos',
             'ci', 'celular', 'fecha', 'latitud', 'longitud', 'direccion'
         ]));
 
@@ -150,5 +151,73 @@ class MiembroController extends Controller
         }
 
         return response()->json(['message' => 'No test member found']);
+    }
+
+    // --- Device Management Methods ---
+
+    public function getDevices(string $id)
+    {
+        $miembro = Miembro::with('user.dispositivos')->findOrFail($id);
+        if (!$miembro->user) {
+            return response()->json(['devices' => [], 'limit' => 1]);
+        }
+
+        return response()->json([
+            'devices' => $miembro->user->dispositivos,
+            'limit' => $miembro->user->limite_dispositivos ?? 1
+        ]);
+    }
+
+    public function updateDeviceLimit(Request $request, string $id)
+    {
+        $request->validate(['limit' => 'required|integer|min:1|max:10']);
+
+        $miembro = Miembro::with('user')->findOrFail($id);
+
+        if ($miembro->user) {
+            $miembro->user->update(['limite_dispositivos' => $request->limit]);
+        }
+
+        return response()->json(['message' => 'Límite actualizado', 'limit' => $request->limit]);
+    }
+
+    public function deleteDevice(string $deviceId)
+    {
+        $device = DispositivoAutorizado::findOrFail($deviceId);
+        $device->delete();
+        return response()->json(['message' => 'Dispositivo eliminado']);
+    }
+
+    public function resetPassword(string $id)
+    {
+        $miembro = Miembro::with('user')->findOrFail($id);
+
+        if (!$miembro->user) {
+            return response()->json(['message' => 'Este miembro no tiene usuario asociado'], 404);
+        }
+
+        // Logic similar to create: First 2 letters of name + first 2 of surname + mb2026
+        $firstName = Str::lower(explode(' ', trim($miembro->nombres))[0]);
+        $lastName = Str::lower(explode(' ', trim($miembro->apellidos))[0]);
+        $passPart1 = Str::substr($firstName, 0, 2);
+        $passPart2 = Str::substr($lastName, 0, 2);
+        $newPassword = "{$passPart1}{$passPart2}mb2026";
+
+        $miembro->user->update([
+            'password' => \Hash::make($newPassword),
+            'password_changed' => false
+        ]);
+
+        // Revocar todas las sesiones actives para forzar re-login
+        $miembro->user->tokens()->delete();
+
+        // Generate Whatsapp link
+        $whatsappUrl = "https://wa.me/591{$miembro->celular}?text=" . urlencode("Hola {$miembro->nombres}, tu contraseña ha sido restablecida. 🔐\n\nNueva contraseña temporal: {$newPassword}\n\nIngresa a la app y cámbiala por seguridad.");
+
+        return response()->json([
+            'message' => 'Contraseña restablecida',
+            'new_password' => $newPassword,
+            'whatsapp_url' => $whatsappUrl
+        ]);
     }
 }

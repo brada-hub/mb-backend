@@ -21,6 +21,7 @@ class Miembro extends Model
         'longitud',
         'direccion',
         'id_seccion',
+        'id_instrumento',
         'id_rol',
         'version_perfil' // Added this field based on user request schema
     ];
@@ -38,6 +39,11 @@ class Miembro extends Model
     public function seccion()
     {
         return $this->belongsTo(Seccion::class, 'id_seccion');
+    }
+
+    public function instrumento()
+    {
+        return $this->belongsTo(Instrumento::class, 'id_instrumento');
     }
 
     public function rol()

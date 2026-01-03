@@ -11,12 +11,8 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::create('secciones', function (Blueprint $table) {
-            $table->id('id_seccion');
-            $table->string('seccion');
-            $table->text('descripcion')->nullable();
-            $table->boolean('estado')->default(true);
-            $table->timestamps();
+        Schema::table('generos', function (Blueprint $table) {
+            $table->integer('orden')->default(0);
         });
     }
 
@@ -25,6 +21,8 @@ return new class extends Migration
      */
     public function down(): void
     {
-        Schema::dropIfExists('secciones');
+        Schema::table('generos', function (Blueprint $table) {
+            $table->dropColumn('orden');
+        });
     }
 };

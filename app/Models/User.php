@@ -19,7 +19,8 @@ class User extends Authenticatable
         'token',
         'estado',
         'id_miembro',
-        'password_changed'
+        'password_changed',
+        'limite_dispositivos'
     ];
 
     protected $hidden = [

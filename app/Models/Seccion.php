@@ -17,4 +17,9 @@ class Seccion extends Model
     {
         return $this->hasMany(Miembro::class, 'id_seccion', 'id_seccion');
     }
+
+    public function instrumentos()
+    {
+        return $this->hasMany(Instrumento::class, 'id_seccion');
+    }
 }

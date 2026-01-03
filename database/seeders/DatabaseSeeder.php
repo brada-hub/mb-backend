@@ -18,6 +18,7 @@ class DatabaseSeeder extends Seeder
         $this->call([
             InitialCatalogSeeder::class,
             PermisosSeeder::class,
+            MusicLibrarySeeder::class,
         ]);
     }
 }

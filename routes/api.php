@@ -11,6 +11,9 @@ use App\Http\Controllers\FinanzaController;
 use App\Http\Controllers\NotificacionController;
 use App\Http\Controllers\RolController;
 use App\Http\Controllers\SeccionController;
+use App\Http\Controllers\GeneroController;
+use App\Http\Controllers\TemaController;
+use App\Http\Controllers\VozInstrumentalController;
 
 Route::get('/test-roles', function() { return response()->json(['status' => 'ok']); });
 
@@ -31,22 +34,33 @@ Route::middleware('auth:sanctum')->group(function () {
     // Miembros
     Route::apiResource('miembros', MiembroController::class);
     Route::post('/miembros/{id}/toggle-status', [MiembroController::class, 'toggleStatus']);
+    Route::get('/miembros/{id}/dispositivos', [MiembroController::class, 'getDevices']);
+    Route::put('/miembros/{id}/limite-dispositivos', [MiembroController::class, 'updateDeviceLimit']);
+    Route::post('/miembros/{id}/reset-password', [MiembroController::class, 'resetPassword']);
+    Route::delete('/dispositivos/{id}', [MiembroController::class, 'deleteDevice']);
 
     // Roles y Secciones
     Route::apiResource('roles', RolController::class);
     Route::get('/permisos-lista', [RolController::class, 'getPermisos']);
     Route::apiResource('secciones', SeccionController::class);
+    Route::apiResource('instrumentos', \App\Http\Controllers\InstrumentoController::class);
 
-    // Asistencia
+    // Biblioteca Musical (Biblioteca de Partituras)
+    Route::apiResource('generos', GeneroController::class);
+    Route::post('/generos/reorder', [GeneroController::class, 'reorder']);
+    Route::apiResource('temas', TemaController::class);
+    Route::apiResource('voces', VozInstrumentalController::class);
+    Route::apiResource('recursos', RecursoController::class);
     Route::post('/asistencia/marcar', [AsistenciaController::class, 'marcar']);
     Route::post('/asistencia/sync-offline', [AsistenciaController::class, 'syncOffline']);
     Route::get('/asistencia/reporte/{id_evento}', [AsistenciaController::class, 'reporte']);
 
     // Eventos
     Route::get('/eventos/proximos', [EventoController::class, 'proximos']);
+    Route::get('/eventos/tipos', [EventoController::class, 'getTipos']);
     Route::get('/eventos/{id}/convocatoria', [EventoController::class, 'convocatoria']);
     Route::patch('/eventos/{id}/confirmar', [EventoController::class, 'confirmar']);
-    Route::apiResource('eventos', EventoController::class)->except(['index', 'show']);
+    Route::apiResource('eventos', EventoController::class);
 
     // Recursos
     Route::get('/recursos', [RecursoController::class, 'index']);

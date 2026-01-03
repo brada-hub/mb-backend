@@ -11,8 +11,8 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::table('users', function (Blueprint $table) {
-            $table->boolean('password_changed')->default(false)->after('password');
+        Schema::table('instrumentos', function (Blueprint $table) {
+            $table->string('icon_slug')->nullable()->after('instrumento');
         });
     }
 
@@ -21,8 +21,8 @@ return new class extends Migration
      */
     public function down(): void
     {
-        Schema::table('users', function (Blueprint $table) {
-            $table->dropColumn('password_changed');
+        Schema::table('instrumentos', function (Blueprint $table) {
+            $table->dropColumn('icon_slug');
         });
     }
 };

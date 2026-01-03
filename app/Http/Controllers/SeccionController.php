@@ -14,7 +14,7 @@ class SeccionController extends Controller
     public function index()
     {
         // El usuario pidió que el borrado sea lógico, así que por defecto solo mostramos las activas
-        return Seccion::where('estado', true)->get();
+        return Seccion::with('instrumentos')->where('estado', true)->get();
     }
 
     /**
@@ -116,7 +116,14 @@ class SeccionController extends Controller
     {
         $seccion = Seccion::findOrFail($id);
 
-        // Verificar si existen miembros asociados a esta sección
+        // 1. Verificar si tiene instrumentos asociados
+        if ($seccion->instrumentos()->count() > 0) {
+            return response()->json([
+                'message' => 'No se puede eliminar la sección porque tiene instrumentos registrados. Elimina primero los instrumentos.'
+            ], 422);
+        }
+
+        // 2. Verificar si existen miembros asociados a esta sección
         if ($seccion->miembros()->count() > 0) {
             return response()->json([
                 'message' => 'No se puede eliminar la sección porque tiene miembros activos asociados.'

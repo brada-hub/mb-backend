@@ -16,6 +16,8 @@ return new class extends Migration
             $table->string('user')->unique();
             $table->string('password');
             $table->boolean('estado')->default(true);
+            $table->boolean('password_changed')->default(false);
+            $table->unsignedBigInteger('id_miembro')->nullable(); // FK se añade luego
             $table->text('token')->nullable();
             $table->rememberToken();
             $table->timestamps();

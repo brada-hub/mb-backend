@@ -25,7 +25,7 @@ class Evento extends Model
         'version_evento' // Added for offline check
     ];
 
-    public function tipoEvento()
+    public function tipo()
     {
         return $this->belongsTo(TipoEvento::class, 'id_tipo_evento');
     }
