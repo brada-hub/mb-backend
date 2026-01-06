@@ -11,10 +11,10 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::create('requerimiento_seccion', function (Blueprint $table) {
+        Schema::create('requerimiento_instrumento', function (Blueprint $table) { // Cambiado
             $table->id('id_requerimiento');
             $table->foreignId('id_evento')->constrained('eventos', 'id_evento')->onDelete('cascade');
-            $table->foreignId('id_seccion')->constrained('secciones', 'id_seccion');
+            $table->foreignId('id_instrumento')->constrained('instrumentos', 'id_instrumento')->onDelete('cascade'); // Cambiado
             $table->integer('cantidad_necesaria');
             $table->timestamps();
         });
@@ -25,6 +25,6 @@ return new class extends Migration
      */
     public function down(): void
     {
-        Schema::dropIfExists('requerimiento_seccion');
+        Schema::dropIfExists('requerimiento_instrumento'); // Cambiado
     }
 };

@@ -14,10 +14,11 @@ class TipoEventoSeeder extends Seeder
     {
         $tipos = [
             ['evento' => 'ENSAYO'],
+            ['evento' => 'CONTRATO'],
+            ['evento' => 'BANDIN'],
+            ['evento' => 'VELADA'],
             ['evento' => 'PRESENTACION'],
             ['evento' => 'REUNION'],
-            ['evento' => 'FIESTA'],
-            ['evento' => 'VIAJE'],
             ['evento' => 'OTRO'],
         ];
 

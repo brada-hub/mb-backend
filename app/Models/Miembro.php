@@ -56,9 +56,14 @@ class Miembro extends Model
         return $this->hasMany(ContactoReferencia::class, 'id_miembro');
     }
 
-    public function asistencia()
+    public function convocatorias()
     {
-        return $this->hasMany(Asistencia::class, 'id_miembro');
+        return $this->hasMany(ConvocatoriaEvento::class, 'id_miembro');
+    }
+
+    public function asistencias()
+    {
+        return $this->hasManyThrough(Asistencia::class, ConvocatoriaEvento::class, 'id_miembro', 'id_convocatoria', 'id_miembro', 'id_convocatoria');
     }
 
     public function permisos()

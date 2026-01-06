@@ -32,11 +32,16 @@ class Evento extends Model
 
     public function asistencias()
     {
-        return $this->hasMany(Asistencia::class, 'id_evento');
+        return $this->hasManyThrough(Asistencia::class, ConvocatoriaEvento::class, 'id_evento', 'id_convocatoria', 'id_evento', 'id_convocatoria');
     }
 
     public function convocatorias()
     {
         return $this->hasMany(ConvocatoriaEvento::class, 'id_evento');
+    }
+
+    public function requerimientos()
+    {
+        return $this->hasMany(RequerimientoInstrumento::class, 'id_evento');
     }
 }

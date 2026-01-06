@@ -11,6 +11,7 @@ return new class extends Migration
         Schema::create('instrumentos', function (Blueprint $table) {
             $table->id('id_instrumento');
             $table->string('instrumento', 100);
+            $table->string('icon_slug')->nullable();
             $table->unsignedBigInteger('id_seccion');
             $table->timestamps();
 

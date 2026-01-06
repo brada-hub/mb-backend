@@ -13,8 +13,7 @@ return new class extends Migration
     {
         Schema::create('asistencias', function (Blueprint $table) {
             $table->id('id_asistencia');
-            $table->foreignId('id_evento')->constrained('eventos', 'id_evento')->onDelete('cascade');
-            $table->foreignId('id_miembro')->constrained('miembros', 'id_miembro')->onDelete('cascade');
+            $table->foreignId('id_convocatoria')->constrained('convocatoria_evento', 'id_convocatoria')->onDelete('cascade');
             $table->time('hora_llegada')->nullable();
             $table->integer('minutos_retraso')->default(0);
             $table->string('estado')->default('PENDIENTE');

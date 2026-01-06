@@ -17,6 +17,7 @@ return new class extends Migration
             $table->string('banner_opcional')->nullable();
             $table->string('color_primario')->default('#4f46e5');
             $table->string('color_secundario')->default('#ec4899');
+            $table->integer('orden')->default(0);
             $table->timestamps();
         });
     }

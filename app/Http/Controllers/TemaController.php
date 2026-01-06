@@ -48,6 +48,11 @@ class TemaController extends Controller
         return $query->get();
     }
 
+    public function show($id)
+    {
+        return Tema::with(['genero', 'videos', 'recursos.archivos', 'recursos.voz', 'recursos.instrumento'])
+            ->findOrFail($id);
+    }
     public function store(Request $request)
     {
         $validated = $request->validate([

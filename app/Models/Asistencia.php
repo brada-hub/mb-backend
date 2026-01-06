@@ -11,8 +11,7 @@ class Asistencia extends Model
     protected $table = 'asistencias';
     protected $primaryKey = 'id_asistencia';
     protected $fillable = [
-        'id_evento',
-        'id_miembro',
+        'id_convocatoria',
         'hora_llegada',
         'minutos_retraso',
         'estado',
@@ -22,13 +21,8 @@ class Asistencia extends Model
         'fecha_sincronizacion'
     ];
 
-    public function evento()
+    public function convocatoria()
     {
-        return $this->belongsTo(Evento::class, 'id_evento');
-    }
-
-    public function miembro()
-    {
-        return $this->belongsTo(Miembro::class, 'id_miembro');
+        return $this->belongsTo(ConvocatoriaEvento::class, 'id_convocatoria');
     }
 }
