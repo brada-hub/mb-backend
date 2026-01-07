@@ -15,7 +15,18 @@ class Genero extends Model
 
     public function getBannerUrlAttribute()
     {
-        return $this->banner_opcional ? '/storage/' . $this->banner_opcional : null;
+        if (!$this->banner_opcional) return null;
+
+        if (str_starts_with($this->banner_opcional, 'http')) {
+            return $this->banner_opcional;
+        }
+
+        // Devolvemos ruta relativa para que el frontend pueda usar el proxy y evitar problemas de hostname (monster-back)
+        if (str_starts_with($this->banner_opcional, 'genres/')) {
+            return '/' . $this->banner_opcional;
+        }
+
+        return '/storage/' . $this->banner_opcional;
     }
 
     public function temas()

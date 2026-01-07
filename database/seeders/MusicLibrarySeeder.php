@@ -14,151 +14,112 @@ class MusicLibrarySeeder extends Seeder
 {
     public function run(): void
     {
-        // 1. Generos
-        $generos = [
-            'MORENADA',
-            'CAPORAL',
-            'TINKUS',
-            'SALAY',
-            'TOBAS',
-            'DIABLADA',
-            'CUECA',
-            'HUAYÑO'
-        ];
-
-        foreach ($generos as $g) {
-            Genero::updateOrCreate(['nombre_genero' => $g]);
-        }
-
-        // 2. Temas de ejemplo para Caporal
-        $caporal = Genero::where('nombre_genero', 'CAPORAL')->first();
-        $temasCaporal = [
-            'SOY CAPORAL',
-            'HERIDA',
-            'OYE MUJER',
-            'FORZADOS DE BOLIVIA'
-        ];
-
-        foreach ($temasCaporal as $t) {
-            Tema::updateOrCreate([
-                'id_genero' => $caporal->id_genero,
-                'nombre_tema' => $t
-            ]);
-        }
-
-        // 3. Temas de ejemplo para Morenada
-        $morenada = Genero::where('nombre_genero', 'MORENADA')->first();
-        $temasMorenada = [
-            'AZUL Y AMARILLO',
-            'LA ALEGRIA DE MI VIDA',
-            'CENTRALISTA DE CORAZON',
-            'A MI BOLIVIA'
-        ];
-
-        foreach ($temasMorenada as $t) {
-            Tema::updateOrCreate([
-                'id_genero' => $morenada->id_genero,
-                'nombre_tema' => $t
-            ]);
-        }
-
-        // 4. Temas de ejemplo para Tinkus
-        $tinkus = Genero::where('nombre_genero', 'TINKUS')->first();
-        $temasTinkus = [
-            'EL LATIDO DE MI PECHO',
-            'FUERZA TINKU'
-        ];
-
-        foreach ($temasTinkus as $t) {
-            Tema::updateOrCreate([
-                'id_genero' => $tinkus->id_genero,
-                'nombre_tema' => $t
-            ]);
-        }
-
-        // 5. Voces Instrumentales comunes
+        // 1. Voces Instrumentales (MOVIDO AL PRINCIPIO PARA PODER USARLAS ABAJO)
         $vocesList = [
             '1RA VOZ',
             '2DA VOZ',
             '3RA VOZ',
-            'GUIA SOLO',
-            'FULL SCORE',
-            'ARRANGEMENT'
+            '8VA VOZ',
+            'GENERAL'
         ];
 
         foreach ($vocesList as $v) {
             VozInstrumental::updateOrCreate(['nombre_voz' => $v]);
         }
 
-        // 6. Sembrar algunos Recursos (Partituras y Audios)
-        // Tomaremos el tema 'SOY CAPORAL' para meterle de todo
-        $soyCaporal = Tema::where('nombre_tema', 'SOY CAPORAL')->first();
+        // 2. Generos
+        $generos = [
+            ['nombre' => 'DIABLADA', 'img' => 'genres/diablada.png', 'p' => '#800000', 's' => '#330000'], // Dark Red
+            ['nombre' => 'CAPORAL', 'img' => 'genres/caporal.png', 'p' => '#4b5563', 's' => '#1f2937'], // Grey
+            ['nombre' => 'TOBAS', 'img' => 'genres/tobas.png', 'p' => '#854d0e', 's' => '#422006'],  // Yellow/Brown
+            ['nombre' => 'TINKUS', 'img' => 'genres/tinkus.png', 'p' => '#065f46', 's' => '#064e3b'],  // Green
+            ['nombre' => 'MORENADA', 'img' => 'genres/morenada.png', 'p' => '#1e3a8a', 's' => '#1e1b4b'], // Dark Blue
+            ['nombre' => 'SALAY', 'img' => 'genres/salay.png', 'p' => '#581c87', 's' => '#3b0764'], // Purple
+        ];
+
+        foreach ($generos as $g) {
+            Genero::updateOrCreate(
+                ['nombre_genero' => $g['nombre']],
+                [
+                    'banner_opcional' => $g['img'],
+                    'color_primario' => $g['p'],
+                    'color_secundario' => $g['s']
+                ]
+            );
+        }
+
+        // 3. Temas de ejemplo para Caporal con Auto-Carga de Partituras
+        $caporal = Genero::where('nombre_genero', 'CAPORAL')->first();
         $v1 = VozInstrumental::where('nombre_voz', '1RA VOZ')->first();
-        $v2 = VozInstrumental::where('nombre_voz', '2DA VOZ')->first();
-        $score = VozInstrumental::where('nombre_voz', 'FULL SCORE')->first();
-
         $trompeta = Instrumento::where('instrumento', 'TROMPETA')->first();
-        $trombon = Instrumento::where('instrumento', 'TROMBÓN')->first();
-        $platillo = Instrumento::where('instrumento', 'PLATILLO')->first();
 
-        if ($soyCaporal && $trompeta) {
-            // Recurso 1: Trompeta 1ra Voz
-            $rec1 = Recurso::create([
-                'id_tema' => $soyCaporal->id_tema,
-                'id_instrumento' => $trompeta->id_instrumento,
-                'id_voz' => $v1->id_voz
+        $temasCaporal = [
+            'INTRO PEREGRINO', 'DOS PALOMITAS', 'CHEVERE QUE CHE', 'BELLEZAS Y RAUDALES',
+            'CUANDO PASA SS', '40 AÑOS SS', 'DATE EL GUSTO', 'AMOROSA PALOMITA',
+            'QUIEN TE HA DICHO', 'HASTA EL AMANECER', 'AY ROSITA', 'SIENTO YO EN EL ALMA',
+            'CHACA CHACA', 'TU MI VIDA ERES TU', 'AZUL Y ROJO', 'ME ENAMORÉ DE UN IMPOSIBLE',
+            'LOCO DE AMOR', 'PORQUE ME ENAMORE DE TI', 'VENENO PARA OLVIDAR', 'QUEMA QUEMA',
+            'AMOR JOVEN', 'PARECE QUE VA A LLOVER', 'SIN LEY', 'TE HE PROMETIDO',
+            'SOY POTOSI', 'SAYA SENSUAL', 'COCHALITA', 'PROMETIMOS NO LLORAR',
+            'ME SOBRAN LAS PALABRAS', 'BELLA', 'SECRETO AMOR', 'DULCE COMPAÑERA',
+            'SAYA AFRODISIACA', 'KUTIMUY', 'JILGUERO FLORES', 'BAILE CALIENTE',
+            'TU ABANDONO', 'PALOMA DEL ALMA MIA', 'UNA POR OTRA', 'TOMARÉ PARA OLVIDAR',
+            'DESDE LEJOS HE VENIDO', 'QUIZAS SI QUIZAS NO', 'POR ELLA', 'SAYA DE COCHABAMBA',
+            'MI MORENA DE SAN SIMON', 'LA PICARA', 'HERIDA', 'COMO HAS HECHO',
+            'AMAMÉ', 'EL REENCUENTRO', 'FABIOLA', 'TE JURO QUE TE AMO', 'VIVIR JUNTO A TÍ'
+        ];
+
+        foreach ($temasCaporal as $t) {
+            $tema = Tema::updateOrCreate([
+                'id_genero' => $caporal->id_genero,
+                'nombre_tema' => $t
             ]);
 
-            Archivo::create([
-                'id_recurso' => $rec1->id_recurso,
-                'url_archivo' => 'https://res.cloudinary.com/demo/image/upload/v1312461204/sample.jpg', // Placeholder
-                'tipo' => 'imagen',
-                'nombre_original' => 'TROMPETA_1_SOY_CAPORAL.JPG',
-                'orden' => 1
-            ]);
+            // Intentar .png y .PNG
+            $fileName = $t . ".png";
+            $publicPath = "partituras/caporal/" . $fileName;
+            $absolutePath = public_path($publicPath);
 
-            Archivo::create([
-                'id_recurso' => $rec1->id_recurso,
-                'url_archivo' => 'https://www.w3.org/WAI/ER/tests/xhtml/testfiles/resources/pdf/dummy.pdf', // Placeholder
-                'tipo' => 'audio',
-                'nombre_original' => 'Audio Guía Trompeta',
-                'orden' => 99
-            ]);
+            if (!file_exists($absolutePath)) {
+                $fileName = $t . ".PNG";
+                $publicPath = "partituras/caporal/" . $fileName;
+                $absolutePath = public_path($publicPath);
+            }
+
+            if (file_exists($absolutePath) && $trompeta && $v1) {
+                $recurso = Recurso::updateOrCreate([
+                    'id_tema' => $tema->id_tema,
+                    'id_instrumento' => $trompeta->id_instrumento,
+                    'id_voz' => $v1->id_voz
+                ]);
+
+                Archivo::updateOrCreate(
+                    ['id_recurso' => $recurso->id_recurso, 'nombre_original' => $fileName],
+                    [
+                        'url_archivo' => url($publicPath),
+                        'tipo' => 'imagen',
+                        'orden' => 1
+                    ]
+                );
+            }
         }
 
-        if ($soyCaporal && $trombon) {
-            // Recurso 2: Trombón 2da Voz
-            $rec2 = Recurso::create([
-                'id_tema' => $soyCaporal->id_tema,
-                'id_instrumento' => $trombon->id_instrumento,
-                'id_voz' => $v2->id_voz
-            ]);
-
-            Archivo::create([
-                'id_recurso' => $rec2->id_recurso,
-                'url_archivo' => 'https://www.w3.org/WAI/ER/tests/xhtml/testfiles/resources/pdf/dummy.pdf',
-                'tipo' => 'pdf',
-                'nombre_original' => 'TROMBON_2_SOY_CAPORAL.PDF',
-                'orden' => 1
-            ]);
+        // 4. Temas de ejemplo para Morenada
+        $morenada = Genero::where('nombre_genero', 'MORENADA')->first();
+        if ($morenada) {
+            $temasMorenada = ['AZUL Y AMARILLO', 'LA ALEGRIA DE MI VIDA', 'CENTRALISTA DE CORAZON', 'A MI BOLIVIA'];
+            foreach ($temasMorenada as $t) {
+                Tema::updateOrCreate(['id_genero' => $morenada->id_genero, 'nombre_tema' => $t]);
+            }
         }
 
-        // Un tema de Morenada con Full Score
-        $azulYAmarillo = Tema::where('nombre_tema', 'AZUL Y AMARILLO')->first();
-        if ($azulYAmarillo && $platillo) {
-            $rec3 = Recurso::create([
-                'id_tema' => $azulYAmarillo->id_tema,
-                'id_instrumento' => $platillo->id_instrumento,
-                'id_voz' => $score->id_voz
-            ]);
-
-            Archivo::create([
-                'id_recurso' => $rec3->id_recurso,
-                'url_archivo' => 'https://www.w3.org/WAI/ER/tests/xhtml/testfiles/resources/pdf/dummy.pdf',
-                'tipo' => 'pdf',
-                'nombre_original' => 'SCORE_GENERAL_AZUL.PDF',
-                'orden' => 1
-            ]);
+        // 5. Temas de ejemplo para Tinkus
+        $tinkus = Genero::where('nombre_genero', 'TINKUS')->first();
+        if ($tinkus) {
+            $temasTinkus = ['EL LATIDO DE MI PECHO', 'FUERZA TINKU'];
+            foreach ($temasTinkus as $t) {
+                Tema::updateOrCreate(['id_genero' => $tinkus->id_genero, 'nombre_tema' => $t]);
+            }
         }
     }
 }

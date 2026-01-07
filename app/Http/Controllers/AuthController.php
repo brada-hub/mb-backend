@@ -152,6 +152,7 @@ class AuthController extends Controller
             'secciones' => \App\Models\Seccion::with('instrumentos')->get(),
             'categorias' => \App\Models\Categoria::all(),
             'permisos' => \App\Models\Permiso::all(),
+            'voces' => \App\Models\VozInstrumental::all(),
              // ... others
         ]);
     }

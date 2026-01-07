@@ -43,7 +43,8 @@ class PermisosSeeder extends Seeder
         if ($jefe) {
             $jefe->permisos()->sync(Permiso::whereIn('permiso', [
                 'VER_DASHBOARD',
-                'GESTION_ASISTENCIA'
+                'GESTION_ASISTENCIA',
+                'GESTION_BIBLIOTECA'
             ])->pluck('id_permiso'));
         }
 

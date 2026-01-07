@@ -26,4 +26,16 @@ class Tema extends Model
     {
         return $this->hasMany(Video::class, 'id_tema');
     }
+
+    public function audio()
+    {
+        return $this->morphOne(Audio::class, 'entidad', 'tipo_entidad', 'id_entidad');
+    }
+
+    public function mixes()
+    {
+        return $this->belongsToMany(Mix::class, 'detalle_mixes', 'id_tema', 'id_mix')
+                    ->withPivot('id_detalle_mix', 'orden')
+                    ->withTimestamps();
+    }
 }

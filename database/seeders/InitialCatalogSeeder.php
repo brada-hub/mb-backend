@@ -11,6 +11,7 @@ use App\Models\Instrumento;
 use App\Models\Categoria;
 use App\Models\User;
 use App\Models\Miembro;
+use App\Models\VozInstrumental;
 
 class InitialCatalogSeeder extends Seeder
 {
@@ -26,8 +27,7 @@ class InitialCatalogSeeder extends Seeder
         // Estructura: 'NOMBRE_SECCION' => ['Instr1', 'Instr2', ...]
         $catalog = [
             'PERCUSIÓN' => ['PLATILLO', 'TAMBOR', 'BOMBO'],
-            'METALES' => ['TROMPETA', 'TROMBÓN', 'BARÍTONO', 'HELICÓN'],
-            'MADERAS' => ['CLARINETE']
+            'VIENTOS' => ['TROMPETA', 'TROMBÓN', 'BARÍTONO', 'HELICÓN', 'CLARINETE']
         ];
 
         // Guardamos referencias para asignar al admin después
@@ -65,12 +65,22 @@ class InitialCatalogSeeder extends Seeder
         // 3. Categorías
         $catA = Categoria::create(['nombre_categoria' => 'A', 'descripcion' => 'NIVEL EXPERTO']);
         $catB = Categoria::create(['nombre_categoria' => 'B', 'descripcion' => 'NIVEL MEDIO']);
+        $catC = Categoria::create(['nombre_categoria' => 'C', 'descripcion' => 'NIVEL BAJO']);
+        $catN = Categoria::create(['nombre_categoria' => 'N', 'descripcion' => 'NIVEL INICIAL']);
+
+        // 3.5 Voces Instrumentales (Base)
+        $v1 = VozInstrumental::updateOrCreate(['nombre_voz' => '1RA VOZ']);
+        $v2 = VozInstrumental::updateOrCreate(['nombre_voz' => '2DA VOZ']);
+        $v3 = VozInstrumental::updateOrCreate(['nombre_voz' => '3RA VOZ']);
+        VozInstrumental::updateOrCreate(['nombre_voz' => '8VA VOZ']);
+        VozInstrumental::updateOrCreate(['nombre_voz' => 'GENERAL']);
 
         // 4. Create initial Admin Member & User
         $adminMiembro = Miembro::create([
             'id_categoria' => $catA->id_categoria,
             'id_seccion' => $trompetaSeccionId,
             'id_instrumento' => $trompetaId,
+            'id_voz' => $v2->id_voz, // 2da Voz
             'id_rol' => $adminRole->id_rol,
             'nombres' => 'ADMIN',
             'apellidos' => 'MONSTER',
@@ -92,6 +102,7 @@ class InitialCatalogSeeder extends Seeder
             'id_categoria' => $catA->id_categoria,
             'id_seccion' => $trompetaSeccionId,
             'id_instrumento' => $trompetaId,
+            'id_voz' => $v2->id_voz, // 2da Voz
             'id_rol' => $directorRole->id_rol,
             'nombres' => 'DIRECTOR',
             'apellidos' => 'GENERAL',

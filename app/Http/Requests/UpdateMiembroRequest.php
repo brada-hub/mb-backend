@@ -123,6 +123,7 @@ class UpdateMiembroRequest extends FormRequest
             'id_categoria' => 'sometimes|required|integer|exists:categorias,id_categoria',
             'id_seccion' => 'sometimes|required|integer|exists:secciones,id_seccion',
             'id_instrumento' => 'nullable|integer|exists:instrumentos,id_instrumento',
+            'id_voz' => 'nullable|integer|exists:voces_instrumentales,id_voz',
             'id_rol' => 'sometimes|required|integer|exists:roles,id_rol',
 
             // ==========================================

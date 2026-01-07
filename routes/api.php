@@ -13,6 +13,7 @@ use App\Http\Controllers\SeccionController;
 use App\Http\Controllers\GeneroController;
 use App\Http\Controllers\TemaController;
 use App\Http\Controllers\VozInstrumentalController;
+use App\Http\Controllers\MixController;
 
 Route::get('/test-roles', function() { return response()->json(['status' => 'ok']); });
 
@@ -21,7 +22,6 @@ Route::post('/check-device', [AuthController::class, 'checkDevice']);
 Route::post('/cleanup-test-member', [MiembroController::class, 'cleanupTestMember']);
 Route::post('/cleanup-test-data', [SeccionController::class, 'cleanupTestData']);
 
-Route::get('/eventos/tipos', [EventoController::class, 'getTipos']);
 Route::apiResource('instrumentos', \App\Http\Controllers\InstrumentoController::class);
 Route::apiResource('miembros', MiembroController::class);
 
@@ -54,6 +54,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::apiResource('temas', TemaController::class);
     Route::apiResource('voces', VozInstrumentalController::class);
     Route::apiResource('recursos', RecursoController::class);
+    Route::apiResource('mixes', MixController::class);
     Route::post('/asistencia/marcar', [AsistenciaController::class, 'marcar']);
     Route::post('/asistencia/sync-offline', [AsistenciaController::class, 'syncOffline']);
     Route::get('/asistencia/reporte/{id_evento}', [AsistenciaController::class, 'reporte']);
@@ -73,6 +74,8 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::delete('/convocatorias/{id}', [\App\Http\Controllers\ConvocatoriaController::class, 'destroy']);
 
     // Eventos
+    Route::get('/eventos/tipos', [EventoController::class, 'getTipos']);
+    Route::post('/eventos/tipos', [EventoController::class, 'storeTipo']);
     Route::get('/eventos/proximos', [EventoController::class, 'proximos']);
     // Route::get('/eventos/tipos'... Moved to public
     // These might be redundant if using ConvocatoriaController but keeping for now

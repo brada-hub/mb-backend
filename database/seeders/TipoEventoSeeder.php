@@ -17,7 +17,6 @@ class TipoEventoSeeder extends Seeder
             ['evento' => 'CONTRATO'],
             ['evento' => 'BANDIN'],
             ['evento' => 'VELADA'],
-            ['evento' => 'PRESENTACION'],
             ['evento' => 'REUNION'],
             ['evento' => 'OTRO'],
         ];

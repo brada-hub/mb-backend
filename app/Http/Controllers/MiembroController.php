@@ -17,7 +17,7 @@ class MiembroController extends Controller
      */
     public function index()
     {
-        return Miembro::with(['categoria', 'seccion', 'instrumento', 'rol.permisos', 'user', 'contactos', 'permisos'])->get();
+        return Miembro::with(['categoria', 'seccion', 'instrumento', 'voz', 'rol.permisos', 'user', 'contactos', 'permisos'])->get();
     }
 
     /**
@@ -28,7 +28,7 @@ class MiembroController extends Controller
         return \DB::transaction(function () use ($request) {
             // 1. Create Miembro (Expediente)
             $miembro = Miembro::create($request->only([
-                'id_categoria', 'id_seccion', 'id_instrumento', 'id_rol', 'nombres', 'apellidos',
+                'id_categoria', 'id_seccion', 'id_instrumento', 'id_voz', 'id_rol', 'nombres', 'apellidos',
                 'ci', 'celular', 'fecha', 'latitud', 'longitud', 'direccion'
             ]));
 
@@ -90,7 +90,7 @@ class MiembroController extends Controller
         $miembro = Miembro::findOrFail($id);
 
         $miembro->update($request->only([
-            'id_categoria', 'id_seccion', 'id_instrumento', 'id_rol', 'nombres', 'apellidos',
+            'id_categoria', 'id_seccion', 'id_instrumento', 'id_voz', 'id_rol', 'nombres', 'apellidos',
             'ci', 'celular', 'fecha', 'latitud', 'longitud', 'direccion'
         ]));
 

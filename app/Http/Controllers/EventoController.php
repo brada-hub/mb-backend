@@ -13,11 +13,50 @@ use Illuminate\Support\Facades\DB;
 class EventoController extends Controller
 {
     public function index() {
-        return Evento::with('tipo')->orderBy('fecha', 'desc')->get();
+        $user = auth()->user();
+
+        // Cargar relación miembro si hace falta
+        if ($user && !$user->relationLoaded('miembro')) {
+            $user->load('miembro');
+        }
+
+        // 1. Obtener TODOS los eventos (Agenda Pública para toda la banda)
+        $eventos = Evento::with('tipo')
+                        ->orderBy('fecha', 'desc')
+                        ->orderBy('hora', 'asc')
+                        ->get();
+
+        // 2. Si es un usuario autenticado con miembro asociado, marcamos cuáles le tocan
+        if ($user && $user->miembro) {
+            // Obtenemos los IDs de eventos donde el miembro está convocado
+            $misEventosIds = \App\Models\ConvocatoriaEvento::where('id_miembro', $user->miembro->id_miembro)
+                                ->pluck('id_evento')
+                                ->toArray();
+
+            $eventos->transform(function($evento) use ($misEventosIds) {
+                // Forzar booleano para el frontend
+                $evento->estoy_convocado = in_array($evento->id_evento, $misEventosIds);
+                return $evento;
+            });
+        }
+
+        return $eventos;
     }
 
     public function getTipos() {
         return TipoEvento::all();
+    }
+
+    public function storeTipo(Request $request) {
+        $validated = $request->validate([
+            'evento' => 'required|string|unique:tipos_evento,evento'
+        ]);
+
+        $tipo = TipoEvento::create([
+            'evento' => mb_strtoupper($validated['evento'], 'UTF-8')
+        ]);
+
+        return response()->json($tipo, 201);
     }
 
     public function proximos() {
