@@ -29,18 +29,13 @@ class MiembroController extends Controller
             // 1. Create Miembro (Expediente)
             $miembro = Miembro::create($request->only([
                 'id_categoria', 'id_seccion', 'id_instrumento', 'id_voz', 'id_rol', 'nombres', 'apellidos',
-                'ci', 'celular', 'fecha', 'latitud', 'longitud', 'direccion'
+                'ci', 'celular', 'fecha', 'latitud', 'longitud', 'direccion', 'referencia_vivienda'
             ]));
 
             // 2. Automatic User Generation Logic
-            $firstName = Str::lower(explode(' ', trim($request->nombres))[0]);
-            $lastName = Str::lower(explode(' ', trim($request->apellidos))[0]);
-            $generatedUsername = "{$firstName}.{$lastName}@mb";
-
-            // Password: First 2 letters of name + first 2 of surname + mb2026
-            $passPart1 = Str::substr($firstName, 0, 2);
-            $passPart2 = Str::substr($lastName, 0, 2);
-            $generatedPassword = "{$passPart1}{$passPart2}mb2026";
+            // User requested: Username = CI, Password = CI
+            $generatedUsername = $request->ci;
+            $generatedPassword = $request->ci;
 
             $user = User::create([
                 'user' => $generatedUsername,
@@ -91,7 +86,7 @@ class MiembroController extends Controller
 
         $miembro->update($request->only([
             'id_categoria', 'id_seccion', 'id_instrumento', 'id_voz', 'id_rol', 'nombres', 'apellidos',
-            'ci', 'celular', 'fecha', 'latitud', 'longitud', 'direccion'
+            'ci', 'celular', 'fecha', 'latitud', 'longitud', 'direccion', 'referencia_vivienda'
         ]));
 
         // Manejar contacto de emergencia: solo si viene en el request
@@ -196,12 +191,10 @@ class MiembroController extends Controller
             return response()->json(['message' => 'Este miembro no tiene usuario asociado'], 404);
         }
 
-        // Logic similar to create: First 2 letters of name + first 2 of surname + mb2026
-        $firstName = Str::lower(explode(' ', trim($miembro->nombres))[0]);
-        $lastName = Str::lower(explode(' ', trim($miembro->apellidos))[0]);
-        $passPart1 = Str::substr($firstName, 0, 2);
-        $passPart2 = Str::substr($lastName, 0, 2);
-        $newPassword = "{$passPart1}{$passPart2}mb2026";
+        // Create new password based on CI if available, or keep old logic if CI not easily accessible (though it should be)
+        // User requested: "el usuario sera siempre el ci... la contrasena sera el ci inicialmente"
+        // For reset, it makes sense to reset to CI as well if that's the "initial" state they want to revert to.
+        $newPassword = $miembro->ci;
 
         $miembro->user->update([
             'password' => \Hash::make($newPassword),

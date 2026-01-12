@@ -14,6 +14,7 @@ use App\Http\Controllers\GeneroController;
 use App\Http\Controllers\TemaController;
 use App\Http\Controllers\VozInstrumentalController;
 use App\Http\Controllers\MixController;
+use App\Http\Controllers\DashboardController;
 
 Route::get('/test-roles', function() { return response()->json(['status' => 'ok']); });
 
@@ -29,6 +30,9 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/logout', [AuthController::class, 'logout']);
     Route::get('/profile', [AuthController::class, 'profile']);
     Route::post('/change-password', [AuthController::class, 'changePassword']);
+
+    // Dashboard
+    Route::get('/dashboard/stats', [DashboardController::class, 'getStats']);
 
     // Sync
     Route::get('/sync/versions', [AuthController::class, 'syncVersions']);
@@ -64,6 +68,12 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/asistencia/lista/{id_evento}', [AsistenciaController::class, 'listaAsistencia']);
     Route::post('/asistencia/marcar-manual', [AsistenciaController::class, 'marcarManual']);
     Route::post('/asistencia/marcar-masivo', [AsistenciaController::class, 'marcarMasivo']);
+    Route::post('/asistencia/cerrar', [AsistenciaController::class, 'cerrarAsistencia']);
+
+    // Analytics Asistencia
+    Route::get('/asistencias/stats', [\App\Http\Controllers\AsistenciaStatsController::class, 'globalStats']);
+    Route::get('/asistencias/member/{id}', [\App\Http\Controllers\AsistenciaStatsController::class, 'memberStats']);
+    Route::get('/asistencias/reporte-grupal', [\App\Http\Controllers\AsistenciaStatsController::class, 'groupReport']);
 
     // Convocatorias
     Route::get('/convocatorias', [\App\Http\Controllers\ConvocatoriaController::class, 'index']);
@@ -71,6 +81,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/convocatorias/postular', [\App\Http\Controllers\ConvocatoriaController::class, 'postular']);
     Route::post('/convocatorias/confirmar', [\App\Http\Controllers\ConvocatoriaController::class, 'confirmar']);
     Route::post('/convocatorias/confirmar-masivo', [\App\Http\Controllers\ConvocatoriaController::class, 'confirmarMasivo']);
+    Route::post('/convocatorias/reemplazar', [\App\Http\Controllers\ConvocatoriaController::class, 'reemplazar']);
     Route::delete('/convocatorias/{id}', [\App\Http\Controllers\ConvocatoriaController::class, 'destroy']);
 
     // Eventos
@@ -87,6 +98,13 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/recursos', [RecursoController::class, 'index']);
     Route::get('/recursos/download/{id}', [RecursoController::class, 'download']);
     Route::post('/recursos', [RecursoController::class, 'store']);
+
+    // Pagos
+    Route::get('/pagos/deudas', [\App\Http\Controllers\PagosController::class, 'resumenDeudas']);
+    Route::get('/pagos/deudas/{id_miembro}', [\App\Http\Controllers\PagosController::class, 'detalleDeuda']);
+    Route::post('/pagos/pagar', [\App\Http\Controllers\PagosController::class, 'pagar']);
+    Route::get('/pagos/mis-pagos', [\App\Http\Controllers\PagosController::class, 'miHistorial']);
+    Route::get('/pagos/reporte-pdf', [\App\Http\Controllers\PagosController::class, 'generarReportePDF']);
 
     // Notificaciones
     Route::get('/notificaciones', [NotificacionController::class, 'index']);

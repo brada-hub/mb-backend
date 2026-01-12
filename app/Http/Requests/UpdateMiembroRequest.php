@@ -36,6 +36,9 @@ class UpdateMiembroRequest extends FormRequest
         if ($this->has('direccion')) {
             $dataToMerge['direccion'] = mb_strtoupper(trim($this->direccion), 'UTF-8');
         }
+        if ($this->has('referencia_vivienda')) {
+            $dataToMerge['referencia_vivienda'] = $this->referencia_vivienda ? mb_strtoupper(trim($this->referencia_vivienda), 'UTF-8') : null;
+        }
         if ($this->has('contacto_nombre')) {
             $dataToMerge['contacto_nombre'] = $this->contacto_nombre ? mb_strtoupper(trim($this->contacto_nombre), 'UTF-8') : null;
         }
@@ -116,6 +119,7 @@ class UpdateMiembroRequest extends FormRequest
                 'max:200',
                 'regex:/^[a-zA-ZñÑáéíóúÁÉÍÓÚüÜ0-9\s.,#\-\/]+$/'
             ],
+            'referencia_vivienda' => 'nullable|string|max:200',
 
             // ==========================================
             // VÍNCULOS OPERATIVOS

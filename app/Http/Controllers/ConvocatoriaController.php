@@ -45,15 +45,31 @@ class ConvocatoriaController extends Controller
         $query = Miembro::with(['instrumento', 'seccion'])
             ->whereDoesntHave('convocatorias', function ($q) use ($id_evento) {
                 $q->where('id_evento', $id_evento);
-            })
-            ->whereDoesntHave('convocatorias.evento', function ($q) use ($eventoTarget) {
-                $q->where('fecha', $eventoTarget->fecha)
-                  ->where('hora', $eventoTarget->hora);
             });
+
+        // REGLA: Si el evento destino es de tipo "Estricto" (CONTRATO, BANDIN),
+        // no mostrar miembros que ya estén en otro evento "Estricto" a la misma hora.
+        // Se excluye ENSAYO de esta validación para permitir flexibilidad.
+        $eventoTarget->load('tipo');
+        $strictTypes = ['CONTRATO', 'BANDIN'];
+
+        if (in_array($eventoTarget->tipo->evento, $strictTypes)) {
+            $query->whereDoesntHave('convocatorias.evento', function ($q) use ($eventoTarget, $strictTypes) {
+                $q->where('fecha', $eventoTarget->fecha)
+                  ->where('hora', $eventoTarget->hora)
+                  ->whereHas('tipo', function($t) use ($strictTypes) {
+                      $t->whereIn('evento', $strictTypes);
+                  });
+            });
+        }
 
         // Filter by section only if provided
         if ($id_seccion) {
             $query->where('id_seccion', $id_seccion);
+        }
+
+        if ($request->has('id_instrumento')) {
+            $query->where('id_instrumento', $request->id_instrumento);
         }
 
         return $query->get();
@@ -111,6 +127,47 @@ class ConvocatoriaController extends Controller
             ->update(['confirmado_por_director' => true]);
 
         return response()->json(['message' => 'Members confirmed successfully']);
+    }
+
+    /**
+     * Reemplazar un miembro de la convocatoria (Solo Admin/Director)
+     */
+    public function reemplazar(Request $request)
+    {
+        $request->validate([
+            'id_convocatoria' => 'required|exists:convocatoria_evento,id_convocatoria',
+            'id_nuevo_miembro' => 'required|exists:miembros,id_miembro'
+        ]);
+
+        $user = auth()->user();
+        $role = strtoupper($user->miembro->rol->rol ?? '');
+
+        if ($role !== 'ADMIN' && $role !== 'DIRECTOR') {
+            return response()->json(['message' => 'Solo el Director o Administrador pueden realizar reemplazos.'], 403);
+        }
+
+        $convocatoria = ConvocatoriaEvento::with('asistencia')->findOrFail($request->id_convocatoria);
+
+        // 1. Verificar si el nuevo miembro ya está convocado para este evento
+        $existe = ConvocatoriaEvento::where('id_evento', $convocatoria->id_evento)
+            ->where('id_miembro', $request->id_nuevo_miembro)
+            ->exists();
+
+        if ($existe) {
+            return response()->json(['message' => 'El músico elegido ya está en la formación de este evento.'], 400);
+        }
+
+        // 2. Realizar el cambio
+        $convocatoria->id_miembro = $request->id_nuevo_miembro;
+
+        // Si hay una asistencia previa, la borramos para que el nuevo marque
+        if ($convocatoria->asistencia) {
+            $convocatoria->asistencia->delete();
+        }
+
+        $convocatoria->save();
+
+        return $convocatoria->load(['miembro.instrumento', 'miembro.seccion']);
     }
 
     /**

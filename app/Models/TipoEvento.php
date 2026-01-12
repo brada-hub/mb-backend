@@ -10,5 +10,5 @@ class TipoEvento extends Model
     use HasFactory;
     protected $table = 'tipos_evento';
     protected $primaryKey = 'id_tipo_evento';
-    protected $fillable = ['evento'];
+    protected $fillable = ['evento', 'minutos_antes_marcar', 'horas_despues_sellar', 'minutos_tolerancia', 'minutos_cierre'];
 }

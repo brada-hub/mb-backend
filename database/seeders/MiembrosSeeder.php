@@ -53,13 +53,16 @@ class MiembrosSeeder extends Seeder
                 // Asignar Voz
                 $vozId = $voces['GRAL']; // Default General
 
-                if (in_array($nombreInstr, ['TROMPETA', 'BARÍTONO', 'BARITONO'])) {
+                if (in_array($nombreInstr, ['PLATILLO', 'TAMBOR', 'TIMBAL', 'BOMBO'])) {
+                    // Percusión no tiene voces (se queda en NULL)
+                    $vozId = null;
+                } elseif (in_array($nombreInstr, ['TROMPETA', 'BARÍTONO', 'BARITONO'])) {
                     // Variar entre 1ra, 2da, 3ra, 8va
                     $opciones = [$voces['1RA'], $voces['2DA'], $voces['3RA'], $voces['8VA']];
                     $vozId = $faker->randomElement($opciones);
                 }
 
-                // Nota: Clarinete, Trombón, Helicón, Percusión se quedan con GENERAL
+                // Nota: Clarinete, Trombón, Helicón se quedan con GENERAL
 
                 // Crear Miembro
                 $miembro = Miembro::create([
@@ -76,24 +79,16 @@ class MiembrosSeeder extends Seeder
                     'id_categoria' => $categoriaAup,
                 ]);
 
-                // Crear Usuario asociado (LOGIN: primernombre.apellido / PASS: 12345678)
-                // User en minúscula para login, pero datos personales en mayúscula
-                $username = strtolower(explode(' ', $nombre)[0] . '.' . explode(' ', $apellido)[0]);
-                $username = preg_replace('/[^a-z0-9.]/', '', iconv('UTF-8', 'ASCII//TRANSLIT', $username));
-
-                // Ensure unique username
-                $baseUsername = $username;
-                $count = 1;
-                while(User::where('user', $username)->exists()) {
-                    $username = $baseUsername . $count++;
-                }
+                // Crear Usuario asociado (LOGIN: CI / PASS: CI)
+                // User requested: "el usuario sera siempre el ci y la contrasena sera el ci incialmente"
+                $username = $ci;
 
                 User::create([
                     'user' => $username,
-                    'password' => Hash::make('12345678'),
+                    'password' => Hash::make($ci), // Password is CI
                     'id_miembro' => $miembro->id_miembro,
                     'estado' => true,
-                    'password_changed' => true,
+                    'password_changed' => false, // Force change on first login if logic exists (User said: "luego obligamos a cambiar")
                 ]);
             }
         }

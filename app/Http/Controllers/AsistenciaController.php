@@ -31,16 +31,28 @@ class AsistenciaController extends Controller
             $horaEvento = Carbon::parse($evento->fecha . ' ' . $evento->hora, 'America/La_Paz');
             $ahora = Carbon::now('America/La_Paz');
 
-            // Permitir abrir asistencia 30 min antes de la hora y hasta 8 horas después
-            $limiteInferior = $horaEvento->copy()->subMinutes(30);
-            $limiteSuperior = $horaEvento->copy()->addHours(8);
+            $tipo = $evento->tipo;
+            $minAntes = $tipo->minutos_antes_marcar ?? 15;
+            $minCierre = $evento->minutos_cierre ?? ($tipo->minutos_cierre ?? 60);
+            $hrsSellar = $tipo->horas_despues_sellar ?? 24;
 
-            $puedeAbrir = $ahora->greaterThanOrEqualTo($limiteInferior) && $ahora->lessThanOrEqualTo($limiteSuperior);
+            // Ventana para MÚSICOS (desde App)
+            $limiteInferior = $horaEvento->copy()->subMinutes($minAntes);
+            $limiteSuperiorMarca = $horaEvento->copy()->addMinutes($minCierre);
 
-            $evento->puede_marcar_asistencia = $puedeAbrir;
-            $evento->minutos_para_inicio = $horaEvento->diffInMinutes($ahora, false);
+            // Ventana para AUDITORÍA (Sellar)
+            $limiteSuperiorSello = $horaEvento->copy()->addHours($hrsSellar);
+
+            $ahora = Carbon::now('America/La_Paz');
+            $puedeMarcar = ($ahora->greaterThanOrEqualTo($limiteInferior) && $ahora->lessThanOrEqualTo($limiteSuperiorMarca)) && !$evento->asistencia_cerrada;
+            $estaSellado = $ahora->greaterThan($limiteSuperiorSello);
+
+            $evento->puede_marcar_asistencia = $puedeMarcar;
+            $evento->esta_sellado = $estaSellado;
+            $evento->minutos_para_inicio = $ahora->diffInMinutes($horaEvento, false);
             $evento->hora_servidor = $ahora->format('H:i:s');
             $evento->limite_inferior = $limiteInferior->format('H:i:s');
+            $evento->limite_superior = $limiteSuperiorMarca->format('H:i:s');
 
             return $evento;
         });
@@ -64,11 +76,17 @@ class AsistenciaController extends Controller
         $horaEvento = Carbon::parse($evento->fecha . ' ' . $evento->hora, 'America/La_Paz');
         $ahora = Carbon::now('America/La_Paz');
 
-        // Estado del control - más estricto
-        $limiteInferior = $horaEvento->copy()->subMinutes(30);
-        $limiteSuperior = $horaEvento->copy()->addHours(8);
+        $tipo = $evento->tipo;
+        $minAntes = $tipo->minutos_antes_marcar ?? 30;
+        $minCierre = $evento->minutos_cierre ?? ($tipo->minutos_cierre ?? 60);
+        $hrsSellar = $tipo->horas_despues_sellar ?? 24;
 
-        $puedeMarcar = $ahora->greaterThanOrEqualTo($limiteInferior) && $ahora->lessThanOrEqualTo($limiteSuperior);
+        // Límites
+        $limiteInferior = $horaEvento->copy()->subMinutes($minAntes);
+        $limiteSuperiorMarca = $horaEvento->copy()->addMinutes($minCierre);
+        $limiteSuperiorSello = $horaEvento->copy()->addHours($hrsSellar);
+
+        $puedeMarcar = ($ahora->greaterThanOrEqualTo($limiteInferior) && $ahora->lessThanOrEqualTo($limiteSuperiorMarca)) && !$evento->asistencia_cerrada;
 
         // Obtener instrumentos únicos de los convocados para filtrado
         $instrumentos = $convocatorias->map(function($c) {
@@ -80,10 +98,68 @@ class AsistenciaController extends Controller
             'convocatorias' => $convocatorias,
             'instrumentos' => $instrumentos,
             'puede_marcar' => $puedeMarcar,
-            'hora_evento' => $horaEvento->format('H:i'),
-            'hora_actual' => $ahora->format('H:i'),
-            'limite_inferior' => $limiteInferior->format('H:i')
+            'asistencia_cerrada' => $evento->asistencia_cerrada
         ]);
+    }
+
+    /**
+     * Cerrar manualmente la asistencia
+     */
+    public function cerrarAsistencia(Request $request)
+    {
+        $request->validate(['id_evento' => 'required|exists:eventos,id_evento']);
+
+        $user = auth()->user();
+        $role = strtoupper($user->miembro->rol->rol ?? '');
+
+        if ($role !== 'ADMIN' && $role !== 'DIRECTOR') {
+            return response()->json(['message' => 'Solo Admin/Director pueden cerrar asistencia.'], 403);
+        }
+
+        $evento = Evento::findOrFail($request->id_evento);
+
+        // 1. Marcar automáticamente como FALTA a los que no tienen registro
+        $convocatoriasSinAsistencia = ConvocatoriaEvento::where('id_evento', $evento->id_evento)
+            ->where('confirmado_por_director', true)
+            ->whereDoesntHave('asistencia')
+            ->get();
+
+        foreach ($convocatoriasSinAsistencia as $conv) {
+            Asistencia::create([
+                'id_convocatoria' => $conv->id_convocatoria,
+                'estado' => 'FALTA',
+                'observacion' => 'Cierre automático de asistencia',
+                'fecha_sincronizacion' => now()
+            ]);
+        }
+
+        // 2. Cerrar el evento
+        $evento->asistencia_cerrada = true;
+        $evento->save();
+
+        return response()->json(['message' => 'Asistencia cerrada. Los pendientes se marcaron como FALTA.', 'evento' => $evento]);
+    }
+
+    /**
+     * Verifica si todos los convocados ya tienen asistencia y cierra el evento si es así.
+     */
+    private function checkAutoClose($id_evento)
+    {
+        $evento = Evento::find($id_evento);
+        if (!$evento || $evento->asistencia_cerrada) return;
+
+        $totalConvocados = ConvocatoriaEvento::where('id_evento', $id_evento)
+            ->where('confirmado_por_director', true)
+            ->count();
+
+        $totalAsistencias = Asistencia::whereHas('convocatoria', function($q) use ($id_evento) {
+            $q->where('id_evento', $id_evento);
+        })->count();
+
+        if ($totalConvocados > 0 && $totalAsistencias >= $totalConvocados) {
+            $evento->asistencia_cerrada = true;
+            $evento->save();
+        }
     }
 
     /**
@@ -93,16 +169,48 @@ class AsistenciaController extends Controller
     {
         $request->validate([
             'id_convocatoria' => 'required|exists:convocatoria_evento,id_convocatoria',
-            'estado' => 'required|in:PUNTUAL,RETRASO,FALTA,JUSTIFICADO'
+            'estado' => 'required|in:PRESENTE,FALTA,JUSTIFICADO',
+            'observacion' => 'nullable|string'
         ]);
 
         $convocatoria = ConvocatoriaEvento::with('evento')->findOrFail($request->id_convocatoria);
         $evento = $convocatoria->evento;
 
-        // Verificar que es el día del evento
-        $hoyStr = Carbon::now('America/La_Paz')->toDateString();
-        if ($evento->fecha !== $hoyStr) {
-            return response()->json(['message' => 'Solo puedes marcar asistencia el día del evento'], 403);
+        $horaEvento = Carbon::parse($evento->fecha . ' ' . $evento->hora, 'America/La_Paz');
+        $ahora = Carbon::now('America/La_Paz');
+
+        // Registro Sellado tras N horas configuradas por tipo
+        $tipo = $evento->tipo;
+        $hrsDespues = $tipo->horas_despues_sellar ?? 24;
+
+        if ($ahora->greaterThan($horaEvento->copy()->addHours($hrsDespues))) {
+            $role = auth()->user()->miembro->rol->rol ?? '';
+            if (strtoupper($role) !== 'ADMIN') {
+                return response()->json(['message' => 'Este registro ya está sellado por auditoría.'], 403);
+            }
+        }
+
+        // --- RESTRICCIONES PARA JEFE DE SECCIÓN ---
+        $user = auth()->user();
+        $miMiembro = $user->miembro;
+        $role = strtoupper($miMiembro->rol->rol ?? '');
+
+        if ($role === 'JEFE DE SECCION' || str_contains($role, 'JEFE')) {
+            // 1. Solo puede marcar a gente de su instrumento
+            if ($convocatoria->miembro->id_instrumento !== $miMiembro->id_instrumento && $role !== 'ADMIN') {
+                return response()->json(['message' => 'Solo puedes marcar asistencia a integrantes de tu instrumento.'], 403);
+            }
+
+            // 3. Jefes no pueden dar permisos (JUSTIFICADO)
+            if ($request->estado === 'JUSTIFICADO' && $role !== 'ADMIN' && $role !== 'DIRECTOR') {
+                 return response()->json(['message' => 'Solo el Director o Administrador pueden otorgar permisos (Justificados).'], 403);
+            }
+        }
+
+        // 2. Protección GPS Universal: Ni director ni jefes pueden cambiar un marcado GPS legal, solo ADMIN
+        $asistenciaExistente = Asistencia::where('id_convocatoria', $request->id_convocatoria)->first();
+        if ($asistenciaExistente && $asistenciaExistente->latitud_marcado !== null && $role !== 'ADMIN') {
+            return response()->json(['message' => 'No puedes modificar una asistencia registrada legítimamente vía GPS.'], 403);
         }
 
         $horaEvento = Carbon::parse($evento->fecha . ' ' . $evento->hora, 'America/La_Paz');
@@ -120,9 +228,12 @@ class AsistenciaController extends Controller
                 'hora_llegada' => $ahora->toTimeString(),
                 'minutos_retraso' => $minutosRetraso,
                 'estado' => $request->estado,
+                'observacion' => $request->observacion,
                 'fecha_sincronizacion' => now()
             ]
         );
+
+        $this->checkAutoClose($evento->id_evento);
 
         return response()->json($asistencia);
     }
@@ -136,16 +247,27 @@ class AsistenciaController extends Controller
             'id_evento' => 'required|exists:eventos,id_evento',
             'asistencias' => 'required|array',
             'asistencias.*.id_convocatoria' => 'required|exists:convocatoria_evento,id_convocatoria',
-            'asistencias.*.estado' => 'required|in:PUNTUAL,RETRASO,FALTA,JUSTIFICADO'
+            'asistencias.*.estado' => 'required|in:PRESENTE,FALTA,JUSTIFICADO'
         ]);
 
         $evento = Evento::findOrFail($request->id_evento);
+        $horaEvento = Carbon::parse($evento->fecha . ' ' . $evento->hora, 'America/La_Paz');
+        $ahora = Carbon::now('America/La_Paz');
 
-        // Verificar que es el día del evento
-        $hoyStr = Carbon::now('America/La_Paz')->toDateString();
-        if ($evento->fecha !== $hoyStr) {
-            return response()->json(['message' => 'Solo puedes marcar asistencia el día del evento'], 403);
+        // Registro Sellado tras N horas configuradas por tipo
+        $tipo = $evento->tipo;
+        $hrsDespues = $tipo->horas_despues_sellar ?? 24;
+
+        if ($ahora->greaterThan($horaEvento->copy()->addHours($hrsDespues))) {
+            $role = auth()->user()->miembro->rol->rol ?? '';
+            if (strtoupper($role) !== 'ADMIN') {
+                return response()->json(['message' => 'El control masivo ya está sellado por auditoría.'], 403);
+            }
         }
+
+        $user = auth()->user();
+        $miMiembro = $user->miembro;
+        $miRole = strtoupper($miMiembro->rol->rol ?? '');
 
         $horaEvento = Carbon::parse($evento->fecha . ' ' . $evento->hora, 'America/La_Paz');
         $ahora = Carbon::now('America/La_Paz');
@@ -153,6 +275,18 @@ class AsistenciaController extends Controller
         $registros = [];
 
         foreach ($request->asistencias as $data) {
+            $conv = ConvocatoriaEvento::with('miembro')->find($data['id_convocatoria']);
+            if (!$conv) continue;
+
+            // Restricción GPS: Ni director ni jefes pueden sobreescribir un marcado GPS legal
+            $existente = Asistencia::where('id_convocatoria', $data['id_convocatoria'])->first();
+            if ($existente && $existente->latitud_marcado !== null && $miRole !== 'ADMIN') continue;
+
+            // Restricción Jefe: Solo su instrumento
+            if (($miRole === 'JEFE DE SECCION' || str_contains($miRole, 'JEFE')) && $miRole !== 'ADMIN') {
+                if ($conv->miembro->id_instrumento !== $miMiembro->id_instrumento) continue;
+            }
+
             $minutosRetraso = 0;
             if ($data['estado'] === 'RETRASO') {
                 $minutosRetraso = max(0, $ahora->diffInMinutes($horaEvento, false) * -1);
@@ -170,6 +304,8 @@ class AsistenciaController extends Controller
 
             $registros[] = $asistencia;
         }
+
+        $this->checkAutoClose($evento->id_evento);
 
         return response()->json([
             'message' => 'Asistencia registrada correctamente',
@@ -233,10 +369,54 @@ class AsistenciaController extends Controller
             return response()->json(['message' => 'Tu convocatoria no ha sido confirmada todavía'], 403);
         }
 
-        $evento = Evento::find($request->id_evento);
+        $evento = Evento::with('tipo')->find($request->id_evento);
+        $tipo = $evento->tipo;
 
-        $now = Carbon::now();
-        $horaEvento = Carbon::parse($evento->fecha . ' ' . $evento->hora);
+        $now = Carbon::now('America/La_Paz');
+        $horaEvento = Carbon::parse($evento->fecha . ' ' . $evento->hora, 'America/La_Paz');
+
+        // --- VALIDACIÓN GEOGRÁFICA ---
+        if ($evento->latitud && $evento->longitud) {
+            $earthRadius = 6371000; // metros
+            $latFrom = deg2rad($request->latitud);
+            $lonFrom = deg2rad($request->longitud);
+            $latTo = deg2rad($evento->latitud);
+            $lonTo = deg2rad($evento->longitud);
+
+            $latDelta = $latTo - $latFrom;
+            $lonDelta = $lonTo - $lonFrom;
+
+            $angle = 2 * asin(sqrt(pow(sin($latDelta / 2), 2) +
+                cos($latFrom) * cos($latTo) * pow(sin($lonDelta / 2), 2)));
+
+            $distancia = $angle * $earthRadius;
+            $radioMaximo = $evento->radio ?? 100;
+
+            if ($distancia > $radioMaximo) {
+                return response()->json([
+                    'message' => 'Estás demasiado lejos del punto de encuentro.',
+                    'distancia' => round($distancia, 2),
+                    'radio_permitido' => $radioMaximo
+                ], 403);
+            }
+        }
+
+        // Reglas
+        $minAntes = $tipo->minutos_antes_marcar ?? 15;
+        $minCierre = $evento->minutos_cierre ?? ($tipo->minutos_cierre ?? 60);
+        $minTolerancia = $evento->minutos_tolerancia ?? ($tipo->minutos_tolerancia ?? 15);
+
+        $limiteInferior = $horaEvento->copy()->subMinutes($minAntes);
+        $limiteSuperior = $horaEvento->copy()->addMinutes($minCierre);
+
+        if ($now->lessThan($limiteInferior)) {
+            return response()->json(['message' => 'Todavía es muy pronto para marcar asistencia.'], 403);
+        }
+
+        if ($now->greaterThan($limiteSuperior)) {
+            return response()->json(['message' => 'La asistencia para este evento ya ha cerrado.'], 403);
+        }
+
         $diff = $now->diffInMinutes($horaEvento, false);
 
         $asistencia = Asistencia::updateOrCreate(
@@ -244,12 +424,14 @@ class AsistenciaController extends Controller
             [
                 'hora_llegada' => $now->toTimeString(),
                 'minutos_retraso' => $diff < 0 ? abs($diff) : 0,
-                'estado' => $diff < -15 ? 'RETRASO' : 'PUNTUAL',
+                'estado' => 'PRESENTE',
                 'latitud_marcado' => $request->latitud,
                 'longitud_marcado' => $request->longitud,
                 'fecha_sincronizacion' => now()
             ]
         );
+
+        $this->checkAutoClose($evento->id_evento);
 
         return response()->json($asistencia);
     }

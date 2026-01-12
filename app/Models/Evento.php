@@ -22,7 +22,11 @@ class Evento extends Model
         'id_tipo_evento',
         'ingreso_total_contrato',
         'presupuesto_limite_sueldos',
-        'version_evento' // Added for offline check
+        'version_evento',
+        'minutos_tolerancia',
+        'minutos_tolerancia',
+        'minutos_cierre',
+        'asistencia_cerrada'
     ];
 
     public function tipo()

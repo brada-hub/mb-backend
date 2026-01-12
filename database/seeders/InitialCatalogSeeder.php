@@ -26,7 +26,7 @@ class InitialCatalogSeeder extends Seeder
         // 2. Secciones e Instrumentos
         // Estructura: 'NOMBRE_SECCION' => ['Instr1', 'Instr2', ...]
         $catalog = [
-            'PERCUSIÓN' => ['PLATILLO', 'TAMBOR', 'BOMBO'],
+            'PERCUSIÓN' => ['PLATILLO', 'TAMBOR', 'TIMBAL', 'BOMBO'],
             'VIENTOS' => ['TROMPETA', 'TROMBÓN', 'BARÍTONO', 'HELICÓN', 'CLARINETE']
         ];
 

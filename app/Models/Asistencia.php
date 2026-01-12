@@ -18,7 +18,8 @@ class Asistencia extends Model
         'offline_uuid',
         'latitud_marcado',
         'longitud_marcado',
-        'fecha_sincronizacion'
+        'fecha_sincronizacion',
+        'observacion'
     ];
 
     public function convocatoria()

@@ -32,6 +32,9 @@ class StoreMiembroRequest extends FormRequest
         if ($this->has('direccion')) {
             $dataToMerge['direccion'] = mb_strtoupper(trim($this->direccion), 'UTF-8');
         }
+        if ($this->has('referencia_vivienda')) {
+            $dataToMerge['referencia_vivienda'] = $this->referencia_vivienda ? mb_strtoupper(trim($this->referencia_vivienda), 'UTF-8') : null;
+        }
         if ($this->has('contacto_nombre')) {
             $dataToMerge['contacto_nombre'] = mb_strtoupper(trim($this->contacto_nombre), 'UTF-8');
         }
@@ -63,6 +66,7 @@ class StoreMiembroRequest extends FormRequest
             'latitud' => 'nullable|numeric|between:-90,90',
             'longitud' => 'nullable|numeric|between:-180,180',
             'direccion' => [$sometimes . 'required', 'string', 'min:10', 'max:200', 'regex:/^[a-zA-ZñÑáéíóúÁÉÍÓÚüÜ0-9\s.,#\-\/]+$/'],
+            'referencia_vivienda' => 'nullable|string|max:200',
             'id_categoria' => [$sometimes . 'required', 'integer', 'exists:categorias,id_categoria'],
             'id_seccion' => [$sometimes . 'required', 'integer', 'exists:secciones,id_seccion'],
             'id_instrumento' => 'nullable|integer|exists:instrumentos,id_instrumento',

@@ -48,7 +48,7 @@ class RecursoController extends Controller
             'nuevo_tema_nombre' => 'required_if:id_tema,NEW|nullable|string|max:255',
             'id_genero' => 'required_if:id_tema,NEW|nullable|exists:generos,id_genero',
             'id_instrumento' => 'required|exists:instrumentos,id_instrumento',
-            'id_voz' => 'required|exists:voces_instrumentales,id_voz',
+            'id_voz' => 'nullable|exists:voces_instrumentales,id_voz',
             // Support multiple files
             'new_archivos' => 'nullable|array',
             'new_archivos.*' => 'file|max:20480',
@@ -146,7 +146,7 @@ class RecursoController extends Controller
         $request->validate([
             'id_tema' => 'required',
             'id_instrumento' => 'required|exists:instrumentos,id_instrumento',
-            'id_voz' => 'required|exists:voces_instrumentales,id_voz',
+            'id_voz' => 'nullable|exists:voces_instrumentales,id_voz',
             'existing_files_order' => 'nullable|string', // JSON array of IDs
             'new_archivos' => 'nullable|array',
             'new_archivos.*' => 'file|max:20480',
