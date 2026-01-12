@@ -32,10 +32,12 @@ class PermisosSeeder extends Seeder
             $admin->permisos()->sync(Permiso::all()->pluck('id_permiso'));
         }
 
-        // Link all to DIRECTOR
+        // Link all to DIRECTOR (Except GESTION_ROLES)
         $director = Rol::where('rol', 'DIRECTOR')->first();
         if ($director) {
-            $director->permisos()->sync(Permiso::all()->pluck('id_permiso'));
+            $director->permisos()->sync(
+                Permiso::where('permiso', '!=', 'GESTION_ROLES')->pluck('id_permiso')
+            );
         }
 
         // Link to JEFE DE SECCION (Attendance + Dashboard)
@@ -43,8 +45,7 @@ class PermisosSeeder extends Seeder
         if ($jefe) {
             $jefe->permisos()->sync(Permiso::whereIn('permiso', [
                 'VER_DASHBOARD',
-                'GESTION_ASISTENCIA',
-                'GESTION_BIBLIOTECA'
+                'GESTION_ASISTENCIA'
             ])->pluck('id_permiso'));
         }
 
@@ -52,8 +53,7 @@ class PermisosSeeder extends Seeder
         $miembro = Rol::where('rol', 'MIEMBRO')->first();
         if ($miembro) {
             $miembro->permisos()->sync(Permiso::whereIn('permiso', [
-                'VER_DASHBOARD',
-                'GESTION_BIBLIOTECA'
+                'VER_DASHBOARD'
             ])->pluck('id_permiso'));
         }
     }
