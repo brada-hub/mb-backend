@@ -20,7 +20,9 @@ class User extends Authenticatable
         'estado',
         'id_miembro',
         'password_changed',
-        'limite_dispositivos'
+        'limite_dispositivos',
+        'preferencias_notificaciones',
+        'fcm_token'
     ];
 
     protected $hidden = [
@@ -32,6 +34,7 @@ class User extends Authenticatable
         'estado' => 'boolean',
         'password_changed' => 'boolean',
         'password' => 'hashed',
+        'preferencias_notificaciones' => 'array'
     ];
 
     public function miembro()

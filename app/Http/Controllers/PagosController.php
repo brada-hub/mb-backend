@@ -21,8 +21,8 @@ class PagosController extends Controller
         // Reglas: Evento (CONTRATO|BANDIN), Asistencia (PRESENTE|PUNTUAL|RETRASO), Pagado (FALSE)
 
         $deudas = ConvocatoriaEvento::with(['miembro.instrumento', 'evento.tipo'])
-            ->whereHas('evento.tipo', function($q) {
-                $q->whereIn('evento', ['CONTRATO', 'BANDIN']);
+            ->whereHas('evento', function($q) {
+                $q->where('remunerado', true);
             })
             ->whereHas('asistencia', function($q) {
                 $q->whereIn('estado', ['PRESENTE', 'PUNTUAL', 'RETRASO']);
@@ -41,8 +41,6 @@ class PagosController extends Controller
                 'instrumento' => $miembro->instrumento->instrumento ?? 'N/A',
                 'foto_url' => $miembro->foto_url, // Si existe
                 'total_eventos' => $items->count(),
-                'contratos' => $items->filter(fn($i) => $i->evento->tipo->evento === 'CONTRATO')->count(),
-                'bandines' => $items->filter(fn($i) => $i->evento->tipo->evento === 'BANDIN')->count(),
                 'detalle_ids' => $items->pluck('id_convocatoria'), // Para acciones rápidas
                 'eventos_list' => $items->map(function($i) {
                     return [
@@ -64,8 +62,8 @@ class PagosController extends Controller
     {
         $detalles = ConvocatoriaEvento::with(['evento.tipo', 'asistencia'])
             ->where('id_miembro', $id_miembro)
-            ->whereHas('evento.tipo', function($q) {
-                $q->whereIn('evento', ['CONTRATO', 'BANDIN']);
+            ->whereHas('evento', function($q) {
+                $q->where('remunerado', true);
             })
             ->whereHas('asistencia', function($q) {
                 $q->whereIn('estado', ['PRESENTE', 'PUNTUAL', 'RETRASO']);
@@ -97,11 +95,37 @@ class PagosController extends Controller
             'id_convocatorias.*' => 'exists:convocatoria_evento,id_convocatoria'
         ]);
 
-        ConvocatoriaEvento::whereIn('id_convocatoria', $request->id_convocatorias)
-            ->update([
+        $convocatorias = ConvocatoriaEvento::with('miembro.user')
+            ->whereIn('id_convocatoria', $request->id_convocatorias)
+            ->get();
+
+        foreach ($convocatorias as $conv) {
+            $conv->update([
                 'pagado' => true,
                 'fecha_pago' => Carbon::now('America/La_Paz')
             ]);
+        }
+
+        // Notificar a los músicos
+        $agrupadoPorMiembro = $convocatorias->groupBy('id_miembro');
+        foreach ($agrupadoPorMiembro as $id_miembro => $items) {
+            $miembro = $items->first()->miembro;
+            if ($miembro && $miembro->user) {
+                $cantidad = $items->count();
+                $mensaje = $cantidad === 1
+                    ? "Se ha registrado el pago de 1 evento: {$items->first()->evento->evento} 💰"
+                    : "Se han registrado pagos para {$cantidad} eventos. Revisa tu historial de cobros 💰";
+
+                \App\Models\Notificacion::enviar(
+                    $miembro->user->id_user,
+                    "¡Pago Confirmado!",
+                    $mensaje,
+                    $id_miembro,
+                    'pago',
+                    '/dashboard/mis-pagos'
+                );
+            }
+        }
 
         return response()->json(['message' => 'Pagos registrados exitosamente']);
     }
@@ -139,8 +163,8 @@ class PagosController extends Controller
         // Pagados (Histórico)
         $pagados = ConvocatoriaEvento::with(['evento.tipo'])
             ->where('id_miembro', $id_miembro)
-            ->whereHas('evento.tipo', function($q) {
-                $q->whereIn('evento', ['CONTRATO', 'BANDIN']);
+            ->whereHas('evento', function($q) {
+                $q->where('remunerado', true);
             })
             ->where('pagado', true)
             ->orderBy('fecha_pago', 'desc')
@@ -152,7 +176,7 @@ class PagosController extends Controller
                     'evento' => $c->evento->evento,
                     'tipo' => $c->evento->tipo->evento,
                     'fecha_evento' => $c->evento->fecha,
-                    'fecha_pago' => $c->fecha_pago,
+                    'fecha_pago' => $c->fecha_pago
                 ];
             });
 

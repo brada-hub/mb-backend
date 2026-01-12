@@ -30,6 +30,8 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/logout', [AuthController::class, 'logout']);
     Route::get('/profile', [AuthController::class, 'profile']);
     Route::post('/change-password', [AuthController::class, 'changePassword']);
+    Route::post('/update-preferences', [AuthController::class, 'updatePreferences']);
+    Route::post('/update-fcm-token', [AuthController::class, 'updateFCMToken']);
 
     // Dashboard
     Route::get('/dashboard/stats', [DashboardController::class, 'getStats']);
@@ -69,6 +71,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/asistencia/marcar-manual', [AsistenciaController::class, 'marcarManual']);
     Route::post('/asistencia/marcar-masivo', [AsistenciaController::class, 'marcarMasivo']);
     Route::post('/asistencia/cerrar', [AsistenciaController::class, 'cerrarAsistencia']);
+    Route::post('/asistencia/recordatorio', [AsistenciaController::class, 'enviarRecordatorios']);
 
     // Analytics Asistencia
     Route::get('/asistencias/stats', [\App\Http\Controllers\AsistenciaStatsController::class, 'globalStats']);
@@ -81,6 +84,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/convocatorias/postular', [\App\Http\Controllers\ConvocatoriaController::class, 'postular']);
     Route::post('/convocatorias/confirmar', [\App\Http\Controllers\ConvocatoriaController::class, 'confirmar']);
     Route::post('/convocatorias/confirmar-masivo', [\App\Http\Controllers\ConvocatoriaController::class, 'confirmarMasivo']);
+    Route::post('/convocatorias/responder', [\App\Http\Controllers\ConvocatoriaController::class, 'confirmarMiembro']);
     Route::post('/convocatorias/reemplazar', [\App\Http\Controllers\ConvocatoriaController::class, 'reemplazar']);
     Route::delete('/convocatorias/{id}', [\App\Http\Controllers\ConvocatoriaController::class, 'destroy']);
 
@@ -108,5 +112,7 @@ Route::middleware('auth:sanctum')->group(function () {
 
     // Notificaciones
     Route::get('/notificaciones', [NotificacionController::class, 'index']);
+    Route::get('/notificaciones/unread-count', [NotificacionController::class, 'unreadCount']);
+    Route::post('/notificaciones/marcar-todas', [NotificacionController::class, 'marcarTodasLeidas']);
     Route::patch('/notificaciones/{id}/leer', [NotificacionController::class, 'leer']);
 });

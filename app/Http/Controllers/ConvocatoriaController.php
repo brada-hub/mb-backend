@@ -106,9 +106,20 @@ class ConvocatoriaController extends Controller
             'id_convocatoria' => 'required|exists:convocatoria_evento,id_convocatoria'
         ]);
 
-        $convocatoria = ConvocatoriaEvento::findOrFail($request->id_convocatoria);
+        $convocatoria = ConvocatoriaEvento::with(['miembro.user', 'evento'])->findOrFail($request->id_convocatoria);
         $convocatoria->confirmado_por_director = true;
         $convocatoria->save();
+
+        if ($convocatoria->miembro && $convocatoria->miembro->user) {
+            \App\Models\Notificacion::enviar(
+                $convocatoria->miembro->user->id_user,
+                "¡Nueva Convocatoria! 🎷",
+                "Fuiste seleccionado para el evento: {$convocatoria->evento->evento}. Revisa tu agenda.",
+                $convocatoria->id_evento,
+                'convocatoria',
+                "/dashboard/eventos/{$convocatoria->id_evento}/convocatoria"
+            );
+        }
 
         return response()->json($convocatoria);
     }
@@ -123,10 +134,48 @@ class ConvocatoriaController extends Controller
             'id_convocatorias.*' => 'exists:convocatoria_evento,id_convocatoria'
         ]);
 
-        ConvocatoriaEvento::whereIn('id_convocatoria', $request->id_convocatorias)
-            ->update(['confirmado_por_director' => true]);
+        $convocatorias = ConvocatoriaEvento::with(['miembro.user', 'evento'])
+            ->whereIn('id_convocatoria', $request->id_convocatorias)
+            ->get();
 
-        return response()->json(['message' => 'Members confirmed successfully']);
+        // Agrupar por usuario para no spamear
+        $notificacionesPorUsuario = [];
+
+        foreach ($convocatorias as $conv) {
+            $conv->update(['confirmado_por_director' => true]);
+
+            if ($conv->miembro && $conv->miembro->user) {
+                $userId = $conv->miembro->user->id_user;
+                if (!isset($notificacionesPorUsuario[$userId])) {
+                    $notificacionesPorUsuario[$userId] = [
+                        'eventos' => [],
+                        'user' => $conv->miembro->user
+                    ];
+                }
+                $notificacionesPorUsuario[$userId]['eventos'][] = $conv->evento->evento;
+            }
+        }
+
+        foreach ($notificacionesPorUsuario as $userId => $data) {
+            $count = count($data['eventos']);
+            $nombres = implode(', ', array_slice($data['eventos'], 0, 3));
+            if ($count > 3) $nombres .= "... y otros";
+
+            $mensaje = $count > 1
+                ? "Has sido confirmado para {$count} eventos: {$nombres}."
+                : "Has sido confirmado para el evento: {$data['eventos'][0]}.";
+
+            \App\Models\Notificacion::enviar(
+                $userId,
+                "¡Nuevas Convocatorias! 🎷",
+                $mensaje,
+                null, // id_referencia nulo para agrupación
+                'convocatoria',
+                "/dashboard/eventos"
+            );
+        }
+
+        return response()->json(['status' => 'ok']);
     }
 
     /**
@@ -171,12 +220,52 @@ class ConvocatoriaController extends Controller
     }
 
     /**
+     * Músico confirma o rechaza su asistencia
+     */
+    public function confirmarMiembro(Request $request)
+    {
+        $request->validate([
+            'id_convocatoria' => 'required|exists:convocatoria_evento,id_convocatoria',
+            'confirmado' => 'required|boolean'
+        ]);
+
+        $user = auth()->user();
+        $convocatoria = ConvocatoriaEvento::findOrFail($request->id_convocatoria);
+
+        // Seguridad: Solo el dueño de la convocatoria puede confirmar
+        if ($convocatoria->id_miembro !== $user->miembro->id_miembro) {
+            return response()->json(['message' => 'No autorizado'], 403);
+        }
+
+        $convocatoria->confirmado_por_miembro = $request->confirmado;
+        $convocatoria->save();
+
+        return response()->json([
+            'status' => 'ok',
+            'confirmado' => $convocatoria->confirmado_por_miembro
+        ]);
+    }
+
+    /**
      * Remove from convocatoria
      */
     public function destroy($id)
     {
-        $convocatoria = ConvocatoriaEvento::findOrFail($id);
+        $convocatoria = ConvocatoriaEvento::with(['miembro.user', 'evento'])->findOrFail($id);
+
+        // Notificar al músico antes de eliminar
+        if ($convocatoria->miembro && $convocatoria->miembro->user) {
+            \App\Models\Notificacion::enviar(
+                $convocatoria->miembro->user->id_user,
+                "Participación Cancelada ❌",
+                "Tu participación en el evento '{$convocatoria->evento->evento}' ha sido cancelada.",
+                $convocatoria->id_evento,
+                'cancelacion',
+                '/dashboard/agenda'
+            );
+        }
+
         $convocatoria->delete();
-        return response()->json(null, 204);
+        return response()->json(['message' => 'Eliminado correctamente'], 200);
     }
 }

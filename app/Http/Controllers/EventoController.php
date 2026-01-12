@@ -96,6 +96,8 @@ class EventoController extends Controller
             'radio' => 'required|integer|min:10', // Metros
             'minutos_tolerancia' => 'nullable|integer|min:0',
             'minutos_cierre' => 'nullable|integer|min:0',
+            'remunerado' => 'nullable|boolean',
+            'monto_sugerido' => 'nullable|numeric|min:0',
             'requerimientos' => 'nullable|array',
             'requerimientos.*.id_instrumento' => 'exists:instrumentos,id_instrumento',
             'requerimientos.*.cantidad_necesaria' => 'integer|min:1'
@@ -122,13 +124,25 @@ class EventoController extends Controller
             // Logic for ENSAYO: Auto-convoke everyone
             $tipo = TipoEvento::find($request->id_tipo_evento);
             if ($tipo && strtoupper($tipo->evento) === 'ENSAYO') {
-                $miembros = Miembro::all();
+                $miembros = Miembro::with('user')->get();
                 foreach ($miembros as $miembro) {
-                    ConvocatoriaEvento::create([
+                    $conv = ConvocatoriaEvento::create([
                         'id_evento' => $evento->id_evento,
                         'id_miembro' => $miembro->id_miembro,
                         'confirmado_por_director' => true
                     ]);
+
+                    // Notificación instantánea para ensayos
+                    if ($miembro->user) {
+                        \App\Models\Notificacion::enviar(
+                            $miembro->user->id_user,
+                            "Nuevo Ensayo Agendado 🎭",
+                            "Se ha programado: {$evento->evento} para el " . \Carbon\Carbon::parse($evento->fecha)->format('d/m') . " a las " . \Carbon\Carbon::parse($evento->hora)->format('H:i'),
+                            $conv->id_convocatoria,
+                            'convocatoria',
+                            '/dashboard/agenda'
+                        );
+                    }
                 }
             }
 
@@ -171,6 +185,8 @@ class EventoController extends Controller
                 'radio' => 'required|integer',
                 'minutos_tolerancia' => 'nullable|integer|min:0',
                 'minutos_cierre' => 'nullable|integer|min:0',
+                'remunerado' => 'nullable|boolean',
+                'monto_sugerido' => 'nullable|numeric|min:0',
                 'requerimientos' => 'nullable|array', // Validar array
                 'requerimientos.*.id_instrumento' => 'required|exists:instrumentos,id_instrumento',
                 'requerimientos.*.cantidad_necesaria' => 'required|integer|min:1',

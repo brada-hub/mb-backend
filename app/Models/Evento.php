@@ -26,7 +26,15 @@ class Evento extends Model
         'minutos_tolerancia',
         'minutos_tolerancia',
         'minutos_cierre',
-        'asistencia_cerrada'
+        'asistencia_cerrada',
+        'remunerado',
+        'monto_sugerido'
+    ];
+
+    protected $casts = [
+        'remunerado' => 'boolean',
+        'fecha' => 'date',
+        'asistencia_cerrada' => 'boolean'
     ];
 
     public function tipo()

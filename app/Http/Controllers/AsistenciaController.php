@@ -28,13 +28,16 @@ class AsistenciaController extends Controller
 
         // Agregar info de si el control de asistencia está habilitado
         $eventos = $eventos->map(function($evento) {
-            $horaEvento = Carbon::parse($evento->fecha . ' ' . $evento->hora, 'America/La_Paz');
+            // Fix: Asegurar formato de fecha para evitar errores de parseo con Carbon
+            $fechaStr = ($evento->fecha instanceof Carbon) ? $evento->fecha->format('Y-m-d') : $evento->fecha;
+            $horaEvento = Carbon::parse($fechaStr . ' ' . $evento->hora, 'America/La_Paz');
             $ahora = Carbon::now('America/La_Paz');
 
             $tipo = $evento->tipo;
-            $minAntes = $tipo->minutos_antes_marcar ?? 15;
-            $minCierre = $evento->minutos_cierre ?? ($tipo->minutos_cierre ?? 60);
-            $hrsSellar = $tipo->horas_despues_sellar ?? 24;
+            // Robustez: Valores por defecto si tipo es null
+            $minAntes = $tipo ? ($tipo->minutos_antes_marcar ?? 15) : 15;
+            $minCierre = $evento->minutos_cierre ?? ($tipo ? ($tipo->minutos_cierre ?? 60) : 60);
+            $hrsSellar = $tipo ? ($tipo->horas_despues_sellar ?? 24) : 24;
 
             // Ventana para MÚSICOS (desde App)
             $limiteInferior = $horaEvento->copy()->subMinutes($minAntes);
@@ -73,13 +76,14 @@ class AsistenciaController extends Controller
             ->get();
 
         // Calcular hora del evento para referencia
-        $horaEvento = Carbon::parse($evento->fecha . ' ' . $evento->hora, 'America/La_Paz');
+        $fechaStr = ($evento->fecha instanceof Carbon) ? $evento->fecha->format('Y-m-d') : $evento->fecha;
+        $horaEvento = Carbon::parse($fechaStr . ' ' . $evento->hora, 'America/La_Paz');
         $ahora = Carbon::now('America/La_Paz');
 
         $tipo = $evento->tipo;
-        $minAntes = $tipo->minutos_antes_marcar ?? 30;
-        $minCierre = $evento->minutos_cierre ?? ($tipo->minutos_cierre ?? 60);
-        $hrsSellar = $tipo->horas_despues_sellar ?? 24;
+        $minAntes = $tipo ? ($tipo->minutos_antes_marcar ?? 30) : 30;
+        $minCierre = $evento->minutos_cierre ?? ($tipo ? ($tipo->minutos_cierre ?? 60) : 60);
+        $hrsSellar = $tipo ? ($tipo->horas_despues_sellar ?? 24) : 24;
 
         // Límites
         $limiteInferior = $horaEvento->copy()->subMinutes($minAntes);
@@ -131,6 +135,18 @@ class AsistenciaController extends Controller
                 'observacion' => 'Cierre automático de asistencia',
                 'fecha_sincronizacion' => now()
             ]);
+
+            // Notificar al músico sobre su falta
+            if ($conv->miembro && $conv->miembro->user) {
+                \App\Models\Notificacion::enviar(
+                    $conv->miembro->user->id_user,
+                    "Registro de Inasistencia ⚠️",
+                    "Se ha registrado una FALTA en tu historial para el evento: {$evento->evento}.",
+                    $evento->id_evento,
+                    'asistencia',
+                    '/dashboard/asistencia'
+                );
+            }
         }
 
         // 2. Cerrar el evento
@@ -138,6 +154,41 @@ class AsistenciaController extends Controller
         $evento->save();
 
         return response()->json(['message' => 'Asistencia cerrada. Los pendientes se marcaron como FALTA.', 'evento' => $evento]);
+    }
+
+    /**
+     * Mandar recordatorios a los que no han marcado
+     */
+    public function enviarRecordatorios(Request $request)
+    {
+        $request->validate(['id_evento' => 'required|exists:eventos,id_evento']);
+        $evento = Evento::findOrFail($request->id_evento);
+
+        $convocatoriasPendientes = ConvocatoriaEvento::where('id_evento', $evento->id_evento)
+            ->where('confirmado_por_director', true)
+            ->whereDoesntHave('asistencia')
+            ->with('miembro.user')
+            ->get();
+
+        $enviados = 0;
+        foreach ($convocatoriasPendientes as $conv) {
+            if ($conv->miembro && $conv->miembro->user) {
+                $status = \App\Models\Notificacion::enviar(
+                    $conv->miembro->user->id_user,
+                    "¿Ya llegaste? 🥁",
+                    "Aún no registras tu asistencia para: {$evento->evento}. ¡Hazlo antes de que cierre!",
+                    $evento->id_evento,
+                    'asistencia',
+                    '/dashboard/asistencia'
+                );
+                if ($status) $enviados++;
+            }
+        }
+
+        return response()->json([
+            'message' => "Recordatorios enviados a {$enviados} músicos.",
+            'enviados' => $enviados
+        ]);
     }
 
     /**
@@ -176,12 +227,13 @@ class AsistenciaController extends Controller
         $convocatoria = ConvocatoriaEvento::with('evento')->findOrFail($request->id_convocatoria);
         $evento = $convocatoria->evento;
 
-        $horaEvento = Carbon::parse($evento->fecha . ' ' . $evento->hora, 'America/La_Paz');
+        $fechaStr = ($evento->fecha instanceof Carbon) ? $evento->fecha->format('Y-m-d') : $evento->fecha;
+        $horaEvento = Carbon::parse($fechaStr . ' ' . $evento->hora, 'America/La_Paz');
         $ahora = Carbon::now('America/La_Paz');
 
         // Registro Sellado tras N horas configuradas por tipo
         $tipo = $evento->tipo;
-        $hrsDespues = $tipo->horas_despues_sellar ?? 24;
+        $hrsDespues = $tipo ? ($tipo->horas_despues_sellar ?? 24) : 24;
 
         if ($ahora->greaterThan($horaEvento->copy()->addHours($hrsDespues))) {
             $role = auth()->user()->miembro->rol->rol ?? '';
@@ -213,7 +265,8 @@ class AsistenciaController extends Controller
             return response()->json(['message' => 'No puedes modificar una asistencia registrada legítimamente vía GPS.'], 403);
         }
 
-        $horaEvento = Carbon::parse($evento->fecha . ' ' . $evento->hora, 'America/La_Paz');
+        $fechaStr = ($evento->fecha instanceof Carbon) ? $evento->fecha->format('Y-m-d') : $evento->fecha;
+        $horaEvento = Carbon::parse($fechaStr . ' ' . $evento->hora, 'America/La_Paz');
         $ahora = Carbon::now('America/La_Paz');
 
         // Calcular minutos de retraso si aplica
@@ -251,12 +304,13 @@ class AsistenciaController extends Controller
         ]);
 
         $evento = Evento::findOrFail($request->id_evento);
-        $horaEvento = Carbon::parse($evento->fecha . ' ' . $evento->hora, 'America/La_Paz');
+        $fechaStr = ($evento->fecha instanceof Carbon) ? $evento->fecha->format('Y-m-d') : $evento->fecha;
+        $horaEvento = Carbon::parse($fechaStr . ' ' . $evento->hora, 'America/La_Paz');
         $ahora = Carbon::now('America/La_Paz');
 
         // Registro Sellado tras N horas configuradas por tipo
         $tipo = $evento->tipo;
-        $hrsDespues = $tipo->horas_despues_sellar ?? 24;
+        $hrsDespues = $tipo ? ($tipo->horas_despues_sellar ?? 24) : 24;
 
         if ($ahora->greaterThan($horaEvento->copy()->addHours($hrsDespues))) {
             $role = auth()->user()->miembro->rol->rol ?? '';
@@ -269,7 +323,8 @@ class AsistenciaController extends Controller
         $miMiembro = $user->miembro;
         $miRole = strtoupper($miMiembro->rol->rol ?? '');
 
-        $horaEvento = Carbon::parse($evento->fecha . ' ' . $evento->hora, 'America/La_Paz');
+        $fechaStr = ($evento->fecha instanceof Carbon) ? $evento->fecha->format('Y-m-d') : $evento->fecha;
+        $horaEvento = Carbon::parse($fechaStr . ' ' . $evento->hora, 'America/La_Paz');
         $ahora = Carbon::now('America/La_Paz');
 
         $registros = [];
@@ -373,7 +428,8 @@ class AsistenciaController extends Controller
         $tipo = $evento->tipo;
 
         $now = Carbon::now('America/La_Paz');
-        $horaEvento = Carbon::parse($evento->fecha . ' ' . $evento->hora, 'America/La_Paz');
+        $fechaStr = ($evento->fecha instanceof Carbon) ? $evento->fecha->format('Y-m-d') : $evento->fecha;
+        $horaEvento = Carbon::parse($fechaStr . ' ' . $evento->hora, 'America/La_Paz');
 
         // --- VALIDACIÓN GEOGRÁFICA ---
         if ($evento->latitud && $evento->longitud) {
@@ -402,9 +458,9 @@ class AsistenciaController extends Controller
         }
 
         // Reglas
-        $minAntes = $tipo->minutos_antes_marcar ?? 15;
-        $minCierre = $evento->minutos_cierre ?? ($tipo->minutos_cierre ?? 60);
-        $minTolerancia = $evento->minutos_tolerancia ?? ($tipo->minutos_tolerancia ?? 15);
+        $minAntes = $tipo ? ($tipo->minutos_antes_marcar ?? 15) : 15;
+        $minCierre = $evento->minutos_cierre ?? ($tipo ? ($tipo->minutos_cierre ?? 60) : 60);
+        $minTolerancia = $evento->minutos_tolerancia ?? ($tipo ? ($tipo->minutos_tolerancia ?? 15) : 15);
 
         $limiteInferior = $horaEvento->copy()->subMinutes($minAntes);
         $limiteSuperior = $horaEvento->copy()->addMinutes($minCierre);

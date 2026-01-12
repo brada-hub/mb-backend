@@ -117,12 +117,13 @@ class DashboardController extends Controller
                 })
                 ->get()
                 ->map(function($evento) use ($user) {
-                    $horaEvento = Carbon::parse($evento->fecha . ' ' . $evento->hora, 'America/La_Paz');
+                    $fechaStr = ($evento->fecha instanceof Carbon) ? $evento->fecha->format('Y-m-d') : $evento->fecha;
+                    $horaEvento = Carbon::parse($fechaStr . ' ' . $evento->hora, 'America/La_Paz');
                     $ahora = Carbon::now('America/La_Paz');
                     $tipo = $evento->tipo;
 
-                    $minAntes = $tipo->minutos_antes_marcar ?? 15;
-                    $minCierre = $evento->minutos_cierre ?? ($tipo->minutos_cierre ?? 60);
+                    $minAntes = $tipo ? ($tipo->minutos_antes_marcar ?? 15) : 15;
+                    $minCierre = $evento->minutos_cierre ?? ($tipo ? ($tipo->minutos_cierre ?? 60) : 60);
 
                     $limiteInferior = $horaEvento->copy()->subMinutes($minAntes);
                     $limiteSuperior = $horaEvento->copy()->addMinutes($minCierre);

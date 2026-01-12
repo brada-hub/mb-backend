@@ -156,4 +156,27 @@ class AuthController extends Controller
              // ... others
         ]);
     }
+
+    public function updatePreferences(Request $request)
+    {
+        $request->validate([
+            'preferences' => 'required|array'
+        ]);
+
+        $user = $request->user();
+        $user->preferencias_notificaciones = $request->preferences;
+        $user->save();
+
+        return response()->json(['status' => 'ok', 'preferences' => $user->preferencias_notificaciones]);
+    }
+
+    public function updateFCMToken(Request $request)
+    {
+        $request->validate(['fcm_token' => 'required|string']);
+        $user = $request->user();
+        $user->fcm_token = $request->fcm_token;
+        $user->save();
+
+        return response()->json(['status' => 'ok']);
+    }
 }
