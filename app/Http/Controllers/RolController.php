@@ -10,7 +10,9 @@ class RolController extends Controller
 {
     public function index()
     {
-        return Rol::with('permisos')->get();
+        return Rol::with('permisos')
+            ->whereNotIn('rol', ['ADMIN', 'SUPER_ADMIN'])
+            ->get();
     }
 
     public function store(Request $request)
@@ -23,7 +25,8 @@ class RolController extends Controller
 
         $rol = Rol::create([
             'rol' => mb_strtoupper($validated['rol'], 'UTF-8'),
-            'descripcion' => $validated['descripcion'] ? mb_strtoupper($validated['descripcion'], 'UTF-8') : null
+            'descripcion' => $validated['descripcion'] ? mb_strtoupper($validated['descripcion'], 'UTF-8') : null,
+            'es_protegido' => false // Solo SuperAdmin puede crear protegidos vía seeder
         ]);
 
         if (isset($validated['permisos'])) {
@@ -35,12 +38,18 @@ class RolController extends Controller
 
     public function show(string $id)
     {
-        return Rol::with('permisos')->findOrFail($id);
+        $rol = Rol::with('permisos')->findOrFail($id);
+        if (in_array($rol->rol, ['ADMIN', 'SUPER_ADMIN'])) abort(404);
+        return $rol;
     }
 
     public function update(Request $request, string $id)
     {
         $rol = Rol::findOrFail($id);
+
+        if ($rol->es_protegido) {
+            return response()->json(['message' => 'Este es un rol de fábrica y no puede ser modificado.'], 403);
+        }
 
         $validated = $request->validate([
             'rol' => 'string|max:255',
@@ -68,6 +77,10 @@ class RolController extends Controller
     public function destroy(string $id)
     {
         $rol = Rol::findOrFail($id);
+
+        if ($rol->es_protegido) {
+            return response()->json(['message' => 'Este es un rol de fábrica y no puede ser eliminado.'], 403);
+        }
 
         if ($rol->miembros()->count() > 0) {
             return response()->json([

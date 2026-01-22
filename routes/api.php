@@ -18,20 +18,20 @@ use App\Http\Controllers\DashboardController;
 
 Route::get('/test-roles', function() { return response()->json(['status' => 'ok']); });
 
+// Public Auth routes only (login, check-device)
 Route::post('/login', [AuthController::class, 'login']);
 Route::post('/check-device', [AuthController::class, 'checkDevice']);
 Route::post('/cleanup-test-member', [MiembroController::class, 'cleanupTestMember']);
 Route::post('/cleanup-test-data', [SeccionController::class, 'cleanupTestData']);
 
-Route::apiResource('instrumentos', \App\Http\Controllers\InstrumentoController::class);
-Route::apiResource('miembros', MiembroController::class);
-
 Route::middleware('auth:sanctum')->group(function () {
     Route::post('/logout', [AuthController::class, 'logout']);
     Route::get('/profile', [AuthController::class, 'profile']);
     Route::post('/change-password', [AuthController::class, 'changePassword']);
+    Route::post('/complete-profile', [AuthController::class, 'completeProfile']);
     Route::post('/update-preferences', [AuthController::class, 'updatePreferences']);
-    Route::post('/update-fcm-token', [AuthController::class, 'updateFCMToken']);
+    Route::post('/update-theme', [AuthController::class, 'updateTheme']);
+    Route::post('/update-fcm-token', [AuthController::class, 'updateFCMToken'])->middleware('plan.limits:NOTIFICACIONES_PUSH');
 
     // Dashboard
     Route::get('/dashboard/stats', [DashboardController::class, 'getStats']);
@@ -41,7 +41,8 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/sync/master-data', [AuthController::class, 'syncMasterData']);
 
     // Miembros
-    // Route::apiResource('miembros', MiembroController::class); // Moved to public
+    Route::apiResource('miembros', MiembroController::class);
+    Route::apiResource('instrumentos', \App\Http\Controllers\InstrumentoController::class);
     Route::post('/miembros/{id}/toggle-status', [MiembroController::class, 'toggleStatus']);
     Route::get('/miembros/{id}/dispositivos', [MiembroController::class, 'getDevices']);
     Route::put('/miembros/{id}/limite-dispositivos', [MiembroController::class, 'updateDeviceLimit']);
@@ -55,12 +56,14 @@ Route::middleware('auth:sanctum')->group(function () {
     // Route::apiResource('instrumentos', ...); // Moved to public
 
     // Biblioteca Musical (Biblioteca de Partituras)
-    Route::apiResource('generos', GeneroController::class);
-    Route::post('/generos/reorder', [GeneroController::class, 'reorder']);
-    Route::apiResource('temas', TemaController::class);
-    Route::apiResource('voces', VozInstrumentalController::class);
-    Route::apiResource('recursos', RecursoController::class);
-    Route::apiResource('mixes', MixController::class);
+    Route::middleware('plan.limits:BIBLIOTECA')->group(function () {
+        Route::apiResource('generos', GeneroController::class);
+        Route::post('/generos/reorder', [GeneroController::class, 'reorder']);
+        Route::apiResource('temas', TemaController::class);
+        Route::apiResource('voces', VozInstrumentalController::class);
+        Route::apiResource('recursos', RecursoController::class);
+        Route::apiResource('mixes', MixController::class);
+    });
     Route::post('/asistencia/marcar', [AsistenciaController::class, 'marcar']);
     Route::post('/asistencia/sync-offline', [AsistenciaController::class, 'syncOffline']);
     Route::get('/asistencia/reporte/{id_evento}', [AsistenciaController::class, 'reporte']);
@@ -77,6 +80,8 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/asistencias/stats', [\App\Http\Controllers\AsistenciaStatsController::class, 'globalStats']);
     Route::get('/asistencias/member/{id}', [\App\Http\Controllers\AsistenciaStatsController::class, 'memberStats']);
     Route::get('/asistencias/reporte-grupal', [\App\Http\Controllers\AsistenciaStatsController::class, 'groupReport']);
+    Route::get('/asistencias/reporte-grupal/pdf', [\App\Http\Controllers\AsistenciaStatsController::class, 'downloadGroupReportPdf']);
+    Route::get('/asistencias/rankings', [\App\Http\Controllers\AsistenciaStatsController::class, 'getRankings']);
 
     // Convocatorias
     Route::get('/convocatorias', [\App\Http\Controllers\ConvocatoriaController::class, 'index']);
@@ -115,4 +120,15 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/notificaciones/unread-count', [NotificacionController::class, 'unreadCount']);
     Route::post('/notificaciones/marcar-todas', [NotificacionController::class, 'marcarTodasLeidas']);
     Route::patch('/notificaciones/{id}/leer', [NotificacionController::class, 'leer']);
+
+    // ========== SUPER ADMIN ROUTES ==========
+    Route::prefix('superadmin')->group(function () {
+        Route::get('/stats', [\App\Http\Controllers\SuperAdminController::class, 'getStats']);
+        Route::get('/bandas', [\App\Http\Controllers\SuperAdminController::class, 'listBandas']);
+        Route::post('/bandas', [\App\Http\Controllers\SuperAdminController::class, 'createBanda']);
+        Route::put('/bandas/{id}', [\App\Http\Controllers\SuperAdminController::class, 'updateBanda']);
+        Route::post('/bandas/{id}/admin', [\App\Http\Controllers\SuperAdminController::class, 'createBandaAdmin']);
+        Route::post('/impersonate/{id}', [\App\Http\Controllers\SuperAdminController::class, 'impersonateBanda']);
+        Route::post('/stop-impersonate', [\App\Http\Controllers\SuperAdminController::class, 'stopImpersonating']);
+    });
 });

@@ -25,6 +25,17 @@ class MiembroController extends Controller
      */
     public function store(StoreMiembroRequest $request)
     {
+        // Validar límite de miembros del plan SaaS
+        $user = \Auth::user();
+        if (!$user->isSuperAdmin()) {
+            $banda = $user->banda;
+            if ($banda && $banda->haAlcanzadoLimiteMiembros()) {
+                return response()->json([
+                    'message' => 'Has alcanzado el límite de tu plan. Mejora a un plan superior para registrar más músicos.'
+                ], 403);
+            }
+        }
+
         return \DB::transaction(function () use ($request) {
             // 1. Create Miembro (Expediente)
             $miembro = Miembro::create($request->only([

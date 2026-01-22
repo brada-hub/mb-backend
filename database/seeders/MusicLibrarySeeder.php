@@ -14,6 +14,10 @@ class MusicLibrarySeeder extends Seeder
 {
     public function run(): void
     {
+        // Obtener Banda Principal
+        $banda = \App\Models\Banda::where('slug', 'monster-band')->first();
+        $idBanda = $banda ? $banda->id_banda : null;
+
         // 1. Voces Instrumentales (MOVIDO AL PRINCIPIO PARA PODER USARLAS ABAJO)
         $vocesList = [
             '1RA VOZ',
@@ -24,7 +28,7 @@ class MusicLibrarySeeder extends Seeder
         ];
 
         foreach ($vocesList as $v) {
-            VozInstrumental::updateOrCreate(['nombre_voz' => $v]);
+            VozInstrumental::updateOrCreate(['nombre_voz' => $v]); // Voces son globales (sin id_banda en fillable/migration?? Check this)
         }
 
         // 2. Generos
@@ -43,7 +47,8 @@ class MusicLibrarySeeder extends Seeder
                 [
                     'banner_opcional' => $g['img'],
                     'color_primario' => $g['p'],
-                    'color_secundario' => $g['s']
+                    'color_secundario' => $g['s'],
+                    'id_banda' => $idBanda
                 ]
             );
         }
@@ -73,6 +78,8 @@ class MusicLibrarySeeder extends Seeder
             $tema = Tema::updateOrCreate([
                 'id_genero' => $caporal->id_genero,
                 'nombre_tema' => $t
+            ], [
+                'id_banda' => $idBanda
             ]);
 
             // Intentar .png y .PNG
@@ -109,7 +116,7 @@ class MusicLibrarySeeder extends Seeder
         if ($morenada) {
             $temasMorenada = ['AZUL Y AMARILLO', 'LA ALEGRIA DE MI VIDA', 'CENTRALISTA DE CORAZON', 'A MI BOLIVIA'];
             foreach ($temasMorenada as $t) {
-                Tema::updateOrCreate(['id_genero' => $morenada->id_genero, 'nombre_tema' => $t]);
+                Tema::updateOrCreate(['id_genero' => $morenada->id_genero, 'nombre_tema' => $t], ['id_banda' => $idBanda]);
             }
         }
 
@@ -118,7 +125,7 @@ class MusicLibrarySeeder extends Seeder
         if ($tinkus) {
             $temasTinkus = ['EL LATIDO DE MI PECHO', 'FUERZA TINKU'];
             foreach ($temasTinkus as $t) {
-                Tema::updateOrCreate(['id_genero' => $tinkus->id_genero, 'nombre_tema' => $t]);
+                Tema::updateOrCreate(['id_genero' => $tinkus->id_genero, 'nombre_tema' => $t], ['id_banda' => $idBanda]);
             }
         }
     }

@@ -2,12 +2,14 @@
 
 namespace App\Models;
 
+use App\Traits\BelongsToBanda;
+
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 
 class Evento extends Model
 {
-    use HasFactory;
+    use HasFactory, BelongsToBanda;
     protected $table = 'eventos';
     protected $primaryKey = 'id_evento';
     protected $fillable = [
@@ -24,16 +26,16 @@ class Evento extends Model
         'presupuesto_limite_sueldos',
         'version_evento',
         'minutos_tolerancia',
-        'minutos_tolerancia',
         'minutos_cierre',
         'asistencia_cerrada',
         'remunerado',
-        'monto_sugerido'
+        'monto_sugerido',
+        'id_banda'
     ];
 
     protected $casts = [
         'remunerado' => 'boolean',
-        'fecha' => 'date',
+        'fecha' => 'date:Y-m-d',
         'asistencia_cerrada' => 'boolean'
     ];
 

@@ -17,11 +17,40 @@ class InitialCatalogSeeder extends Seeder
 {
     public function run(): void
     {
-        // 1. Roles
-        $adminRole = Rol::create(['rol' => 'ADMIN', 'descripcion' => 'ADMINISTRADOR DEL SISTEMA']);
-        $directorRole = Rol::create(['rol' => 'DIRECTOR', 'descripcion' => 'DIRECTOR DE LA BANDA']);
-        $jefeRole = Rol::create(['rol' => 'JEFE DE SECCION', 'descripcion' => 'ENCARGADO DE UNA SECCIÓN']);
-        $miembroRole = Rol::create(['rol' => 'MIEMBRO', 'descripcion' => 'INTEGRANTE DE LA BANDA']);
+        // 0. Crear Banda Principal (Monster Band)
+        $banda = \App\Models\Banda::create([
+            'nombre' => 'Monster Band',
+            'slug' => 'monster-band',
+            'logo' => null,
+            'color_primario' => '#6366f1',
+            'color_secundario' => '#161b2c',
+            'estado' => true,
+            'plan' => 'PRO',
+            'max_miembros' => 100
+        ]);
+
+        // 1. Roles (Asignados a la banda)
+        $superRole = Rol::create(['rol' => 'ADMIN', 'descripcion' => 'ADMINISTRADOR DE LA PLATAFORMA (GLOBAL)', 'id_banda' => $banda->id_banda, 'es_protegido' => true]);
+
+        // Roles de Fábrica
+        $directorRole = Rol::create([
+            'rol' => 'DIRECTOR',
+            'descripcion' => 'CONTROL TOTAL DE LA BANDA (GESTIÓN, FINANZAS Y CÁTALOGOS)',
+            'id_banda' => $banda->id_banda,
+            'es_protegido' => true
+        ]);
+        $delegadoRole = Rol::create([
+            'rol' => 'DELEGADO / JEFE',
+            'descripcion' => 'CONTROL DE ASISTENCIAS, EVENTOS Y AGENDA',
+            'id_banda' => $banda->id_banda,
+            'es_protegido' => true
+        ]);
+        $miembroRole = Rol::create([
+            'rol' => 'MÚSICO',
+            'descripcion' => 'SOLO LECTURA DE AGENDA, RECURSOS Y BIBLIOTECA',
+            'id_banda' => $banda->id_banda,
+            'es_protegido' => true
+        ]);
 
         // 2. Secciones e Instrumentos
         // Estructura: 'NOMBRE_SECCION' => ['Instr1', 'Instr2', ...]
@@ -37,13 +66,15 @@ class InitialCatalogSeeder extends Seeder
             $seccion = Seccion::create([
                 'seccion' => $secName,
                 'descripcion' => 'SECCIÓN DE ' . $secName,
-                'estado' => true // Default active
+                'estado' => true, // Default active
+                'id_banda' => $banda->id_banda
             ]);
 
             foreach ($instruments as $instName) {
                 $inst = Instrumento::create([
                     'instrumento' => $instName,
-                    'id_seccion' => $seccion->id_seccion
+                    'id_seccion' => $seccion->id_seccion,
+                    'id_banda' => $banda->id_banda
                 ]);
 
                 if ($instName === 'TROMPETA') {
@@ -62,7 +93,8 @@ class InitialCatalogSeeder extends Seeder
         $trompetaSeccionId = $trompetaInst ? $trompetaInst->id_seccion : 1;
 
 
-        // 3. Categorías
+        // 3. Categorías (Globales o por banda? Asumimos globales por ahora, pero editamos si necesario)
+        // Schema categorias no tiene id_banda según lo visto antes, son catálogos globales.
         $catA = Categoria::create(['nombre_categoria' => 'A', 'descripcion' => 'NIVEL EXPERTO']);
         $catB = Categoria::create(['nombre_categoria' => 'B', 'descripcion' => 'NIVEL MEDIO']);
         $catC = Categoria::create(['nombre_categoria' => 'C', 'descripcion' => 'NIVEL BAJO']);
@@ -81,20 +113,23 @@ class InitialCatalogSeeder extends Seeder
             'id_seccion' => $trompetaSeccionId,
             'id_instrumento' => $trompetaId,
             'id_voz' => $v2->id_voz, // 2da Voz
-            'id_rol' => $adminRole->id_rol,
+            'id_rol' => $directorRole->id_rol,
             'nombres' => 'ADMIN',
             'apellidos' => 'MONSTER',
             'ci' => '0000000',
             'celular' => '70000000',
             'direccion' => 'SEDE CENTRAL',
+            'id_banda' => $banda->id_banda
         ]);
 
         User::create([
-            'user' => 'admin.monster@mb',
-            'password' => Hash::make('monster2026'),
+            'user' => 'admin',
+            'password' => Hash::make('admin'),
             'id_miembro' => $adminMiembro->id_miembro,
             'estado' => true,
-            'password_changed' => true
+            'password_changed' => true,
+            'id_banda' => $banda->id_banda,
+            'is_super_admin' => false
         ]);
 
         // Director for web testing
@@ -109,14 +144,16 @@ class InitialCatalogSeeder extends Seeder
             'ci' => '1111111',
             'celular' => '71111111',
             'direccion' => 'SEDE CENTRAL',
+            'id_banda' => $banda->id_banda
         ]);
 
         User::create([
-            'user' => 'director.general@mb',
-            'password' => Hash::make('director2026'),
+            'user' => 'director',
+            'password' => Hash::make('director'),
             'id_miembro' => $directorMiembro->id_miembro,
             'estado' => true,
-            'password_changed' => true
+            'password_changed' => true,
+            'id_banda' => $banda->id_banda
         ]);
     }
 }

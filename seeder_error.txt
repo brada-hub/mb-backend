@@ -1,0 +1,30 @@
+
+  [37;44m INFO [39;49m Seeding database.  
+
+
+  [41;1m Illuminate\Database\QueryException [49;22m
+
+[39;1m  SQLSTATE[42703]: Undefined column: 7 ERROR:  column "id" does not exist
+LINE 1: ..."updated_at") values ($1, $2, $3, $4, $5, $6) returning "id"
+                                                                   ^ (Connection: pgsql, SQL: insert into "bandas" ("nombre", "slug", "color_primario", "color_secundario", "created_at", "updated_at") values (Monster Band, monster-band, #6366f1, #161b2c, 2026-01-12 12:25:06, 2026-01-12 12:25:06) returning "id")[39;22m
+
+  at [32mvendor/laravel/framework/src/Illuminate/Database/Connection.php[39m:[32m826[39m
+    [90m822[0m[90m▕ [0m[35;1m                    [0m[39;1m$this[0m[35;1m->[0m[39;1mgetName[0m[35;1m(), [0m[39;1m$query[0m[35;1m, [0m[39;1m$this[0m[35;1m->[0m[39;1mprepareBindings[0m[35;1m([0m[39;1m$bindings[0m[35;1m), [0m[39;1m$e[0m
+    [90m823[0m[90m▕ [0m[39;1m                [0m[35;1m);[0m
+    [90m824[0m[90m▕ [0m[35;1m            }[0m
+    [90m825[0m[90m▕ [0m
+[31;1m  ➜ [0m[3;1m826[0m[90m▕ [0m[35;1m            throw new [0m[39;1mQueryException[0m[35;1m([0m
+    [90m827[0m[90m▕ [0m[35;1m                [0m[39;1m$this[0m[35;1m->[0m[39;1mgetName[0m[35;1m(), [0m[39;1m$query[0m[35;1m, [0m[39;1m$this[0m[35;1m->[0m[39;1mprepareBindings[0m[35;1m([0m[39;1m$bindings[0m[35;1m), [0m[39;1m$e[0m
+    [90m828[0m[90m▕ [0m[39;1m            [0m[35;1m);[0m
+    [90m829[0m[90m▕ [0m[35;1m        }[0m
+    [90m830[0m[90m▕ [0m[35;1m    }[0m
+
+      [2m+8 vendor frames [22m
+
+  [33m9   [39m[39;1mdatabase/seeders/MultiTenantTransitionSeeder.php[39;22m:[39;1m17[39;22m
+  [90m    Illuminate\Database\Query\Builder::insertGetId()[39m
+      [2m+23 vendor frames [22m
+
+  [33m33  [39m[39;1martisan[39;22m:[39;1m16[39;22m
+  [90m    Illuminate\Foundation\Application::handleCommand(Object(Symfony\Component\Console\Input\ArgvInput))[39m
+

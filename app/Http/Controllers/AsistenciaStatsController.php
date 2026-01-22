@@ -183,9 +183,26 @@ class AsistenciaStatsController extends Controller
 
     public function groupReport(Request $request)
     {
+        $data = $this->getReportData($request);
+        return response()->json($data);
+    }
+
+    public function downloadGroupReportPdf(Request $request)
+    {
+        $data = $this->getReportData($request);
+
+        $pdf = \Barryvdh\DomPDF\Facade\Pdf::loadView('reports.group_attendance', $data);
+
+        $filename = 'Reporte_Asistencia_' . Carbon::now()->format('Y-m-d') . '.pdf';
+        return $pdf->download($filename);
+    }
+
+    private function getReportData(Request $request)
+    {
         $startDate = $request->input('start_date', Carbon::now()->startOfYear()->toDateString());
         $endDate = $request->input('end_date', Carbon::now()->toDateString());
         $idSeccion = $request->input('id_seccion');
+        $idTipoEvento = $request->input('id_tipo_evento');
 
         $query = Miembro::with(['instrumento', 'seccion']);
 
@@ -195,11 +212,16 @@ class AsistenciaStatsController extends Controller
 
         $miembros = $query->get();
 
-        $stats = DB::table('convocatoria_evento')
+        $statsQuery = DB::table('convocatoria_evento')
             ->join('eventos', 'convocatoria_evento.id_evento', '=', 'eventos.id_evento')
             ->leftJoin('asistencias', 'convocatoria_evento.id_convocatoria', '=', 'asistencias.id_convocatoria')
-            ->whereBetween('eventos.fecha', [$startDate, $endDate])
-            ->select(
+            ->whereBetween('eventos.fecha', [$startDate, $endDate]);
+
+        if ($idTipoEvento) {
+            $statsQuery->where('eventos.id_tipo_evento', $idTipoEvento);
+        }
+
+        $stats = $statsQuery->select(
                 'convocatoria_evento.id_miembro',
                 DB::raw('COUNT(*) as total_events'),
                 DB::raw("SUM(CASE WHEN asistencias.estado IN ('PUNTUAL', 'RETRASO') THEN 1 ELSE 0 END) as present_count"),
@@ -212,7 +234,6 @@ class AsistenciaStatsController extends Controller
             ->keyBy('id_miembro');
 
         $report = $miembros->map(function ($m) use ($stats) {
-            // Use array syntax or property syntax depending on how Miembro is handled
             $s = $stats->get($m->id_miembro) ?? (object)[
                 'total_events' => 0,
                 'present_count' => 0,
@@ -222,6 +243,8 @@ class AsistenciaStatsController extends Controller
             ];
 
             $rate = $s->total_events > 0 ? round(($s->present_count / $s->total_events) * 100) : 0;
+            // Calculate streak just for the report table if needed, or omit.
+            // Reuse logic if necessary, but for now we keep it simple.
 
             return [
                 'id_miembro' => $m->id_miembro,
@@ -234,7 +257,10 @@ class AsistenciaStatsController extends Controller
                 'absent_count' => (int)$s->absent_count,
                 'justified_count' => (int)$s->justified_count,
                 'unmarked_count' => (int)$s->unmarked_count,
-                'rate' => $rate
+                'rate' => $rate,
+                // Adding a mocked streak here for compatibility with ReportesHome if it expects it in the future,
+                // but real streak calculation is expensive. Let's stick to the rate being the ranking metric.
+                'streak' => $rate // Using rate as a proxy for "score" in simple views
             ];
         });
 
@@ -249,7 +275,7 @@ class AsistenciaStatsController extends Controller
         // Desertores: less than 50% but at least 3 opportunities
         $desertores = $report->filter(fn($r) => $r['total_events'] >= 3 && $r['rate'] < 50)->values();
 
-        return response()->json([
+        return [
             'report' => $report,
             'summary' => [
                 'group_average' => $groupAverage,
@@ -260,9 +286,58 @@ class AsistenciaStatsController extends Controller
             'filters' => [
                 'start_date' => $startDate,
                 'end_date' => $endDate,
-                'id_seccion' => $idSeccion
+                'id_seccion' => $idSeccion,
+                'id_tipo_evento' => $idTipoEvento
             ]
-        ]);
+        ];
+    }
+
+    public function getRankings(Request $request)
+    {
+        // Get all member IDs
+        $miembros = Miembro::with('instrumento')->get();
+        if ($miembros->isEmpty()) return response()->json(['rankings' => []]);
+
+        // Pre-fetch all past assistances for these members
+        $allAsistencias = DB::table('convocatoria_evento')
+            ->join('eventos', 'convocatoria_evento.id_evento', '=', 'eventos.id_evento')
+            ->leftJoin('asistencias', 'convocatoria_evento.id_convocatoria', '=', 'asistencias.id_convocatoria')
+            ->where('eventos.fecha', '<', Carbon::today()->toDateString())
+            ->where('eventos.id_banda', auth()->user()->id_banda ?? 0)
+            ->select('convocatoria_evento.id_miembro', 'asistencias.estado', 'eventos.fecha')
+            ->orderBy('eventos.fecha', 'desc')
+            ->get()
+            ->groupBy('id_miembro');
+
+        $rankings = [];
+
+        foreach ($miembros as $miembro) {
+            $records = $allAsistencias->get($miembro->id_miembro, collect());
+            $streak = 0;
+
+            foreach ($records as $rec) {
+                if (in_array($rec->estado, ['PUNTUAL', 'RETRASO'])) {
+                    $streak++;
+                } else if ($rec->estado === 'FALTA' || is_null($rec->estado)) {
+                    // Stop streak on absence
+                    break;
+                }
+            }
+
+            if ($streak > 0) {
+                $rankings[] = [
+                    'id_miembro' => $miembro->id_miembro,
+                    'nombres' => $miembro->nombres,
+                    'apellidos' => $miembro->apellidos,
+                    'instrumento' => $miembro->instrumento?->instrumento ?? 'N/A',
+                    'streak' => $streak
+                ];
+            }
+        }
+
+        usort($rankings, fn($a, $b) => $b['streak'] - $a['streak']);
+
+        return response()->json(['rankings' => $rankings]);
     }
 }
 

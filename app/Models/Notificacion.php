@@ -2,15 +2,17 @@
 
 namespace App\Models;
 
+use App\Traits\BelongsToBanda;
+
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 
 class Notificacion extends Model
 {
-    use HasFactory;
+    use HasFactory, BelongsToBanda;
     protected $table = 'notificaciones';
     protected $primaryKey = 'id_notificacion';
-    protected $fillable = ['id_user', 'titulo', 'mensaje', 'leido', 'id_referencia', 'tipo', 'ruta'];
+    protected $fillable = ['id_user', 'titulo', 'mensaje', 'leido', 'id_referencia', 'tipo', 'ruta', 'id_banda'];
 
     /**
      * Helper para enviar una notificación rápidamente
@@ -45,6 +47,7 @@ class Notificacion extends Model
             'id_referencia' => $id_referencia,
             'tipo' => $tipo,
             'ruta' => $ruta,
+            'id_banda' => $user->id_banda ?? null,
             'leido' => false
         ]);
 

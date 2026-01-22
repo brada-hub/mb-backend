@@ -2,6 +2,8 @@
 
 namespace App\Models;
 
+use App\Traits\BelongsToBanda;
+
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
@@ -18,11 +20,15 @@ class User extends Authenticatable
         'password',
         'token',
         'estado',
+        'is_super_admin',
         'id_miembro',
         'password_changed',
+        'profile_completed',
         'limite_dispositivos',
         'preferencias_notificaciones',
-        'fcm_token'
+        'fcm_token',
+        'theme_preference',
+        'id_banda'
     ];
 
     protected $hidden = [
@@ -32,7 +38,9 @@ class User extends Authenticatable
 
     protected $casts = [
         'estado' => 'boolean',
+        'is_super_admin' => 'boolean',
         'password_changed' => 'boolean',
+        'profile_completed' => 'boolean',
         'password' => 'hashed',
         'preferencias_notificaciones' => 'array'
     ];
@@ -45,5 +53,18 @@ class User extends Authenticatable
     public function dispositivos()
     {
         return $this->hasMany(DispositivoAutorizado::class, 'id_user');
+    }
+
+    public function banda()
+    {
+        return $this->belongsTo(Banda::class, 'id_banda');
+    }
+
+    /**
+     * Verifica si el usuario es Super Admin (acceso global a todas las bandas)
+     */
+    public function isSuperAdmin(): bool
+    {
+        return $this->is_super_admin === true;
     }
 }

@@ -20,6 +20,7 @@ class PermisosSeeder extends Seeder
             'GESTION_RECURSOS',
             'GESTION_SECCIONES',
             'GESTION_BIBLIOTECA',
+            'ACCESO_WEB',
         ];
 
         foreach ($permisos as $p) {
@@ -27,33 +28,34 @@ class PermisosSeeder extends Seeder
         }
 
         // Link all to ADMIN
-        $admin = Rol::where('rol', 'ADMIN')->first();
-        if ($admin) {
-            $admin->permisos()->sync(Permiso::all()->pluck('id_permiso'));
+        $super = Rol::where('rol', 'ADMIN')->first();
+        if ($super) {
+            $super->permisos()->sync(Permiso::all()->pluck('id_permiso'));
         }
 
-        // Link all to DIRECTOR (Except GESTION_ROLES)
+        // Link all to DIRECTOR
         $director = Rol::where('rol', 'DIRECTOR')->first();
         if ($director) {
-            $director->permisos()->sync(
-                Permiso::where('permiso', '!=', 'GESTION_ROLES')->pluck('id_permiso')
-            );
+            $director->permisos()->sync(Permiso::all()->pluck('id_permiso'));
         }
 
-        // Link to JEFE DE SECCION (Attendance + Dashboard)
-        $jefe = Rol::where('rol', 'JEFE DE SECCION')->first();
-        if ($jefe) {
-            $jefe->permisos()->sync(Permiso::whereIn('permiso', [
+        // Link to DELEGADO / JEFE (Attendance + Events + Dashboard)
+        $delegado = Rol::where('rol', 'DELEGADO / JEFE')->first();
+        if ($delegado) {
+            $delegado->permisos()->sync(Permiso::whereIn('permiso', [
                 'VER_DASHBOARD',
-                'GESTION_ASISTENCIA'
+                'GESTION_ASISTENCIA',
+                'GESTION_EVENTOS'
             ])->pluck('id_permiso'));
         }
 
-        // Link only basic to MIEMBRO
-        $miembro = Rol::where('rol', 'MIEMBRO')->first();
+        // Link basis to MÚSICO
+        $miembro = Rol::where('rol', 'MÚSICO')->first();
         if ($miembro) {
             $miembro->permisos()->sync(Permiso::whereIn('permiso', [
-                'VER_DASHBOARD'
+                'VER_DASHBOARD',
+                'GESTION_RECURSOS',
+                'GESTION_BIBLIOTECA'
             ])->pluck('id_permiso'));
         }
     }

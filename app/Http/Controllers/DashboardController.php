@@ -14,10 +14,15 @@ class DashboardController extends Controller
 {
     public function getStats()
     {
-        // 1. Miembros Totales
+        $user = auth()->user();
+        // Assuming $user->miembro exists for all users who are not SuperAdmins and have a role.
+        // And $user->is_super_admin is a boolean flag.
+        // A musician is someone who has a miembro record and their role is not ADMIN or DIRECTOR, and they are not a super admin.
+        $isMusico = ($user->miembro && !in_array($user->miembro->rol?->rol, ['ADMIN', 'DIRECTOR'])) && !$user->is_super_admin;
+
+        // 1. Miembros Totales (Solo Admin/SuperAdmin)
         $totalMiembros = Miembro::count();
-        $miembrosEsteMes = Miembro::whereMonth('created_at', Carbon::now()->month)
-            ->count();
+        $miembrosEsteMes = Miembro::whereMonth('created_at', Carbon::now()->month)->count();
 
         // 2. Próximos Eventos (Próximos 7 días)
         $proximosEventos = Evento::where('fecha', '>=', Carbon::today()->toDateString())
@@ -27,111 +32,51 @@ class DashboardController extends Controller
         // 3. Eventos Hoy
         $eventosHoy = Evento::whereDate('fecha', Carbon::today())->count();
 
-        // 4. Eventos Este Mes
-        $eventosEsteMes = Evento::whereYear('fecha', Carbon::now()->year)
-            ->whereMonth('fecha', Carbon::now()->month)
-            ->count();
-
-        // 5. Asistencia Promedio Global
-        $totalConvocados = DB::table('convocatoria_evento')
+        // 4. Asistencia Promedio (Global para Admin, Personal para Músico)
+        $queryConvocados = DB::table('convocatoria_evento')
             ->join('eventos', 'convocatoria_evento.id_evento', '=', 'eventos.id_evento')
             ->where('eventos.fecha', '<', Carbon::today()->toDateString())
-            ->count();
+            ->where('eventos.id_banda', $user->id_banda);
 
-        $totalPresentes = DB::table('asistencias')
+        $queryPresentes = DB::table('asistencias')
             ->join('convocatoria_evento', 'asistencias.id_convocatoria', '=', 'convocatoria_evento.id_convocatoria')
             ->join('eventos', 'convocatoria_evento.id_evento', '=', 'eventos.id_evento')
             ->where('eventos.fecha', '<', Carbon::today()->toDateString())
-            ->whereIn('asistencias.estado', ['PUNTUAL', 'RETRASO'])
-            ->count();
+            ->where('eventos.id_banda', $user->id_banda)
+            ->whereIn('asistencias.estado', ['PUNTUAL', 'RETRASO']);
 
+        if ($isMusico) {
+            $queryConvocados->where('convocatoria_evento.id_miembro', $user->miembro->id_miembro);
+            $queryPresentes->where('convocatoria_evento.id_miembro', $user->miembro->id_miembro);
+        }
+
+        $totalConvocados = $queryConvocados->count();
+        $totalPresentes = $queryPresentes->count();
         $asistenciaPromedio = $totalConvocados > 0 ? round(($totalPresentes / $totalConvocados) * 100) : 0;
 
-        // 6. Asistencia Promedio Mensual
-        $startOfMonth = Carbon::now()->startOfMonth()->toDateString();
-        $endOfMonth = Carbon::now()->endOfMonth()->toDateString();
+        // 5. Heatmap Data (Restringido para Músicos)
+        $heatmapData = $this->getHeatmapData($isMusico, $user);
 
-        $convocadosMes = DB::table('convocatoria_evento')
-            ->join('eventos', 'convocatoria_evento.id_evento', '=', 'eventos.id_evento')
-            ->whereBetween('eventos.fecha', [$startOfMonth, $endOfMonth])
-            ->count();
-
-        $presentesMes = DB::table('asistencias')
-            ->join('convocatoria_evento', 'asistencias.id_convocatoria', '=', 'convocatoria_evento.id_convocatoria')
-            ->join('eventos', 'convocatoria_evento.id_evento', '=', 'eventos.id_evento')
-            ->whereBetween('eventos.fecha', [$startOfMonth, $endOfMonth])
-            ->whereIn('asistencias.estado', ['PUNTUAL', 'RETRASO'])
-            ->count();
-
-        $asistenciaPromedioMes = $convocadosMes > 0 ? round(($presentesMes / $convocadosMes) * 100) : 0;
-
-        // 7. Top Streaks (Músicos con mejores rachas)
-        $topStreaks = $this->calculateTopStreaks();
-
-        // 8. Weekly Data
-        $weeklyData = $this->getWeeklyData();
-
-        // 9. Heatmap Data
-        $year = date('Y');
-        $heatmapData = DB::table('eventos')
-            ->join('convocatoria_evento', 'eventos.id_evento', '=', 'convocatoria_evento.id_evento')
-            ->leftJoin('asistencias', 'convocatoria_evento.id_convocatoria', '=', 'asistencias.id_convocatoria')
-            ->select(
-                'eventos.fecha as date',
-                DB::raw("STRING_AGG(DISTINCT eventos.evento, ', ') as event_names"),
-                DB::raw('COUNT(convocatoria_evento.id_convocatoria) as total_convocados'),
-                DB::raw("SUM(CASE WHEN asistencias.estado IN ('PUNTUAL', 'RETRASO') THEN 1 ELSE 0 END) as total_presentes")
-            )
-            ->whereYear('eventos.fecha', $year)
-            ->groupBy('eventos.fecha')
-            ->get()
-            ->map(function ($day) {
-                $percentage = $day->total_convocados > 0 ? ($day->total_presentes / $day->total_convocados) : 0;
-                $intensity = 0;
-                if ($day->total_convocados > 0) {
-                    if ($percentage == 0) $intensity = 0;
-                    elseif ($percentage < 0.4) $intensity = 1;
-                    elseif ($percentage < 0.7) $intensity = 2;
-                    elseif ($percentage < 0.9) $intensity = 3;
-                    else $intensity = 4;
-                }
-                return [
-                    'date' => $day->date,
-                    'count' => (int)$day->total_presentes,
-                    'total' => (int)$day->total_convocados,
-                    'percentage' => round($percentage * 100),
-                    'events' => $day->event_names,
-                    'level' => $intensity
-                ];
-            });
-
-        // 10. User Specific Data (If authenticated)
-        $misEventos = [];
-        $user = auth()->user();
-        if ($user && $user->miembro) {
+        // 6. User Specific Data
+        $misEventos = collect();
+        if ($user->miembro) {
             $misEventos = Evento::with('tipo')
                 ->whereDate('fecha', Carbon::today())
                 ->whereHas('convocatorias', function($q) use ($user) {
-                    $q->where('id_miembro', $user->miembro->id_miembro)
-                      ->where('confirmado_por_director', true);
+                    $q->where('id_miembro', $user->miembro->id_miembro);
                 })
                 ->get()
                 ->map(function($evento) use ($user) {
                     $fechaStr = ($evento->fecha instanceof Carbon) ? $evento->fecha->format('Y-m-d') : $evento->fecha;
                     $horaEvento = Carbon::parse($fechaStr . ' ' . $evento->hora, 'America/La_Paz');
                     $ahora = Carbon::now('America/La_Paz');
-                    $tipo = $evento->tipo;
 
-                    $minAntes = $tipo ? ($tipo->minutos_antes_marcar ?? 15) : 15;
-                    $minCierre = $evento->minutos_cierre ?? ($tipo ? ($tipo->minutos_cierre ?? 60) : 60);
+                    $minAntes = $evento->tipo ? ($evento->tipo->minutos_antes_marcar ?? 15) : 15;
+                    $minCierre = $evento->minutos_cierre ?? ($evento->tipo ? ($evento->tipo->minutos_cierre ?? 60) : 60);
 
-                    $limiteInferior = $horaEvento->copy()->subMinutes($minAntes);
-                    $limiteSuperior = $horaEvento->copy()->addMinutes($minCierre);
-
-                    $evento->puede_marcar = $ahora->greaterThanOrEqualTo($limiteInferior) && $ahora->lessThanOrEqualTo($limiteSuperior);
+                    $evento->puede_marcar = $ahora->between($horaEvento->copy()->subMinutes($minAntes), $horaEvento->copy()->addMinutes($minCierre));
                     $evento->asistencia = Asistencia::whereHas('convocatoria', function($q) use ($evento, $user) {
-                        $q->where('id_evento', $evento->id_evento)
-                          ->where('id_miembro', $user->miembro->id_miembro);
+                        $q->where('id_evento', $evento->id_evento)->where('id_miembro', $user->miembro->id_miembro);
                     })->first();
 
                     return $evento;
@@ -141,29 +86,28 @@ class DashboardController extends Controller
         return response()->json([
             'stats' => [
                 'miembros' => [
-                    'total' => $totalMiembros,
-                    'nuevos_mes' => $miembrosEsteMes
+                    'total' => $isMusico ? 0 : $totalMiembros,
+                    'nuevos_mes' => $isMusico ? 0 : $miembrosEsteMes
                 ],
                 'eventos' => [
-                    'proximos' => $proximosEventos,
                     'hoy' => $eventosHoy,
-                    'este_mes' => $eventosEsteMes
+                    'proximos' => $proximosEventos
                 ],
                 'asistencia' => [
                     'promedio' => $asistenciaPromedio,
-                    'promedio_mes' => $asistenciaPromedioMes
-                ],
-                'finanzas' => [
-                    'mes' => 0,
-                    'tendencia' => 0
+                    'promedio_mes' => $asistenciaPromedio // Simplificado por ahora
                 ]
             ],
-            'eventos_hoy' => Evento::whereDate('fecha', Carbon::today())->get(),
-            'proximo_evento' => Evento::where('fecha', '>=', Carbon::today())->orderBy('fecha', 'asc')->orderBy('hora', 'asc')->first(),
+            'suscripcion' => $user->id_banda ? [
+                'plan' => $user->banda?->plan ?? 'BASIC',
+                'max_miembros' => $user->banda?->max_miembros ?? 15,
+                'uso_miembros' => Miembro::count(),
+                'pro_activo' => in_array(strtoupper($user->banda?->plan), ['PREMIUM', 'PRO', 'MONSTER'])
+            ] : null,
             'heatmap' => $heatmapData,
-            'top_streaks' => $topStreaks,
-            'weekly' => $weeklyData,
-            'mis_eventos' => $misEventos
+            'mis_eventos' => $misEventos,
+            'top_streaks' => $isMusico ? [] : $this->calculateTopStreaks(),
+            'weekly' => $this->getWeeklyData($isMusico, $user)
         ]);
     }
 
@@ -215,16 +159,22 @@ class DashboardController extends Controller
         return array_slice($streaks, 0, 10);
     }
 
-    private function getWeeklyData()
+    private function getWeeklyData($isMusico = false, $user = null)
     {
         $startOfWeek = Carbon::now()->startOfWeek();
         $endOfWeek = Carbon::now()->endOfWeek();
 
-        $data = DB::table('eventos')
+        $query = DB::table('eventos')
             ->leftJoin('convocatoria_evento', 'eventos.id_evento', '=', 'convocatoria_evento.id_evento')
             ->leftJoin('asistencias', 'convocatoria_evento.id_convocatoria', '=', 'asistencias.id_convocatoria')
-            ->whereBetween('eventos.fecha', [$startOfWeek->toDateString(), $endOfWeek->toDateString()])
-            ->select(
+            ->where('eventos.id_banda', $user->id_banda ?? 0)
+            ->whereBetween('eventos.fecha', [$startOfWeek->toDateString(), $endOfWeek->toDateString()]);
+
+        if ($isMusico && $user && $user->miembro) {
+            $query->where('convocatoria_evento.id_miembro', $user->miembro->id_miembro);
+        }
+
+        $data = $query->select(
                 'eventos.fecha',
                 DB::raw("COUNT(convocatoria_evento.id_convocatoria) as total"),
                 DB::raw("SUM(CASE WHEN asistencias.estado IN ('PUNTUAL', 'RETRASO') THEN 1 ELSE 0 END) as present")
@@ -252,5 +202,31 @@ class DashboardController extends Controller
         }
 
         return $weekly;
+    }
+
+    private function getHeatmapData($isMusico = false, $user = null)
+    {
+        $query = DB::table('asistencias')
+            ->join('convocatoria_evento', 'asistencias.id_convocatoria', '=', 'convocatoria_evento.id_convocatoria')
+            ->join('eventos', 'convocatoria_evento.id_evento', '=', 'eventos.id_evento')
+            ->where('eventos.id_banda', $user->id_banda ?? 0)
+            ->where('asistencias.estado', '!=', 'FALTA')
+            ->select(
+                DB::raw('extract(dow from eventos.fecha) as day'),
+                DB::raw('extract(hour from eventos.hora) as hour'),
+                DB::raw('count(*) as value')
+            );
+
+        if ($isMusico && $user->miembro) {
+            $query->where('convocatoria_evento.id_miembro', $user->miembro->id_miembro);
+        }
+
+        return $query->groupBy('day', 'hour')->get()->map(function($item) {
+            return [
+                'day' => (int)$item->day,
+                'hour' => (int)$item->hour,
+                'value' => (int)$item->value
+            ];
+        });
     }
 }

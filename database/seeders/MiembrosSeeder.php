@@ -17,9 +17,13 @@ class MiembrosSeeder extends Seeder
     {
         $faker = Faker::create('es_BO');
 
+        // Obtener Banda Principal
+        $banda = \App\Models\Banda::where('slug', 'monster-band')->first();
+        $idBanda = $banda ? $banda->id_banda : null;
+
         $instrumentos = Instrumento::all();
-        // Buscar el rol exacto "MIEMBRO"
-        $rolMiembro = Rol::where('rol', 'MIEMBRO')->orWhere('rol', 'like', '%miembro%')->first()->id_rol ?? 4;
+        // Buscar el rol exacto "MÚSICO"
+        $rolMiembro = Rol::where('rol', 'MÚSICO')->first()->id_rol ?? 4;
         $categoriaAup = Categoria::first()->id_categoria ?? 1;
 
         if ($instrumentos->isEmpty()) {
@@ -77,6 +81,7 @@ class MiembrosSeeder extends Seeder
                     'id_voz' => $vozId,
                     'id_rol' => $rolMiembro,
                     'id_categoria' => $categoriaAup,
+                    'id_banda' => $idBanda
                 ]);
 
                 // Crear Usuario asociado (LOGIN: CI / PASS: CI)
@@ -89,6 +94,7 @@ class MiembrosSeeder extends Seeder
                     'id_miembro' => $miembro->id_miembro,
                     'estado' => true,
                     'password_changed' => false, // Force change on first login if logic exists (User said: "luego obligamos a cambiar")
+                    'id_banda' => $idBanda
                 ]);
             }
         }

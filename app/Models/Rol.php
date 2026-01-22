@@ -5,12 +5,15 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 
+use App\Traits\BelongsToBanda;
+
 class Rol extends Model
 {
-    use HasFactory;
+    use HasFactory, BelongsToBanda;
     protected $table = 'roles';
     protected $primaryKey = 'id_rol';
-    protected $fillable = ['rol', 'descripcion'];
+    protected $fillable = ['rol', 'descripcion', 'id_banda', 'es_protegido'];
+    protected $casts = ['es_protegido' => 'boolean'];
 
     public function permisos()
     {

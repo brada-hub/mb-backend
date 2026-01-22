@@ -5,12 +5,14 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 
+use App\Traits\BelongsToBanda;
+
 class Tema extends Model
 {
-    use HasFactory;
+    use HasFactory, BelongsToBanda;
     protected $table = 'temas';
     protected $primaryKey = 'id_tema';
-    protected $fillable = ['id_genero', 'nombre_tema'];
+    protected $fillable = ['id_genero', 'nombre_tema', 'id_banda'];
 
     public function genero()
     {

@@ -5,12 +5,14 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 
+use App\Traits\BelongsToBanda;
+
 class Instrumento extends Model
 {
-    use HasFactory;
+    use HasFactory, BelongsToBanda;
 
     protected $primaryKey = 'id_instrumento';
-    protected $fillable = ['instrumento', 'id_seccion', 'icon_slug'];
+    protected $fillable = ['instrumento', 'id_seccion', 'icon_slug', 'id_banda'];
 
     public function seccion()
     {

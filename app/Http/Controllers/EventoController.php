@@ -45,7 +45,12 @@ class EventoController extends Controller
     }
 
     public function getTipos() {
-        return TipoEvento::all();
+        return TipoEvento::withoutGlobalScope('banda')
+            ->where(function($q) {
+                $q->where('id_banda', auth()->user()->id_banda)
+                  ->orWhereNull('id_banda');
+            })
+            ->get();
     }
 
     public function storeTipo(Request $request) {

@@ -5,13 +5,15 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 
+use App\Traits\BelongsToBanda;
+
 class Mix extends Model
 {
-    use HasFactory;
+    use HasFactory, BelongsToBanda;
 
     protected $table = 'mixes';
     protected $primaryKey = 'id_mix';
-    protected $fillable = ['nombre', 'activo'];
+    protected $fillable = ['nombre', 'activo', 'id_banda'];
 
     protected $casts = [
         'activo' => 'boolean'

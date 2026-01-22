@@ -11,9 +11,9 @@ use Illuminate\Support\Facades\Auth;
 
 class AuthController extends Controller
 {
-    public function login(LoginRequest $request) // Changed Request to LoginRequest
+    public function login(LoginRequest $request)
     {
-        $user = User::with('miembro.rol')->where('user', $request->user)->first(); // Modified user retrieval
+        $user = User::with(['miembro.rol.permisos', 'miembro.permisos', 'banda'])->where('user', $request->user)->first();
 
         // 1. Basic Auth Check
         if (!$user || !Hash::check($request->password, $user->password)) {
@@ -22,14 +22,39 @@ class AuthController extends Controller
 
         if (!$user->estado) return response()->json(['message' => 'Usuario inactivo'], 403);
 
-        // 2. Role Discrimination (Portal vs App)
-        $roleName = $user->miembro->rol->rol ?? 'Desconocido';
+        // 2. Super Admin bypass - no necesita miembro
+        if ($user->isSuperAdmin()) {
+            $token = $user->createToken($request->platform . '-token')->plainTextToken;
 
-        if ($request->platform === 'web' && !$user->id_miembro) {
-            return response()->json(['message' => 'Acceso denegado: Este usuario no tiene un perfil de miembro asociado.'], 403);
+            return response()->json([
+                'token' => $token,
+                'user' => $user,
+                'role' => 'ADMIN',
+                'permissions' => ['*'], // Acceso total
+                'password_changed' => $user->password_changed,
+                'profile_completed' => $user->profile_completed,
+                'is_super_admin' => true
+            ]);
         }
 
-        // 3. Device Bonding (Only for Mobile)
+        // 3. Permissions Calculation (Early calculation for Gatekeeping)
+        $rolePerms = $user->miembro->rol->permisos->pluck('permiso')->toArray();
+        $customPerms = $user->miembro->permisos->pluck('permiso')->toArray();
+        $allPermissions = array_values(array_unique(array_merge($rolePerms, $customPerms)));
+
+        // 4. Role/Platform Discrimination
+        $roleName = $user->miembro->rol->rol ?? 'Desconocido';
+
+        if ($request->platform === 'web') {
+            if (!$user->id_miembro) {
+                 return response()->json(['message' => 'Acceso denegado: Usuario sin perfil.'], 403);
+            }
+            if (!in_array('ACCESO_WEB', $allPermissions)) {
+                return response()->json(['message' => 'Acceso denegado: No tienes permisos para ingresar a la versión Web. Usa la App Móvil.'], 403);
+            }
+        }
+
+        // 4. Device Bonding (Only for Mobile)
         if ($request->platform === 'mobile' && $request->uuid_celular) {
             // Check if THIS specific device is already registered
             $currentDevice = DispositivoAutorizado::where('id_user', $user->id_user)
@@ -60,19 +85,16 @@ class AuthController extends Controller
             }
         }
 
-        $token = $user->createToken($request->platform . '-token')->plainTextToken; // Modified token name
-
-        // 4. Permissions Logic
-        $rolePerms = $user->miembro->rol->permisos->pluck('permiso')->toArray();
-        $customPerms = $user->miembro->permisos->pluck('permiso')->toArray();
-        $allPermissions = array_unique(array_merge($rolePerms, $customPerms));
+        $token = $user->createToken($request->platform . '-token')->plainTextToken;
 
         return response()->json([
             'token' => $token,
             'user' => $user->load('miembro.rol', 'miembro.permisos'),
             'role' => $roleName,
             'permissions' => $allPermissions,
-            'password_changed' => $user->password_changed
+            'password_changed' => $user->password_changed,
+            'profile_completed' => $user->profile_completed,
+            'is_super_admin' => false
         ]);
     }
 
@@ -102,17 +124,37 @@ class AuthController extends Controller
 
     public function profile(Request $request)
     {
-        $user = $request->user()->load('miembro.rol.permisos', 'miembro.permisos', 'miembro.seccion');
+        $user = $request->user();
 
-        $rolePerms = $user->miembro->rol->permisos->pluck('permiso')->toArray();
+        // Si es Super Admin, devolver respuesta especial
+        if ($user->isSuperAdmin()) {
+            return response()->json([
+                'user' => $user,
+                'role' => 'ADMIN',
+                'permissions' => ['*'],
+                'password_changed' => $user->password_changed,
+                'profile_completed' => $user->profile_completed,
+                'is_super_admin' => true
+            ]);
+        }
+
+        $user->load('miembro.rol.permisos', 'miembro.permisos', 'miembro.seccion', 'banda');
+
+        // Validar que tenga miembro asociado
+        if (!$user->miembro) {
+             return response()->json(['message' => 'Perfil de miembro no encontrado'], 500);
+        }
+
+        $rolePerms = $user->miembro->rol?->permisos->pluck('permiso')->toArray() ?? [];
         $customPerms = $user->miembro->permisos->pluck('permiso')->toArray();
-        $allPermissions = array_unique(array_merge($rolePerms, $customPerms));
+        $allPermissions = array_values(array_unique(array_merge($rolePerms, $customPerms)));
 
         return response()->json([
             'user' => $user,
-            'role' => $user->miembro->rol->rol,
+            'role' => $user->miembro->rol->rol ?? 'Sin Rol',
             'permissions' => $allPermissions,
-            'password_changed' => $user->password_changed
+            'password_changed' => $user->password_changed,
+            'profile_completed' => $user->profile_completed
         ]);
     }
 
@@ -146,14 +188,22 @@ class AuthController extends Controller
 
     public function syncMasterData()
     {
+        $user = auth()->user();
+        if (!$user) return response()->json([], 401);
+
         // Return all small catalogs
         return response()->json([
-            'roles' => \App\Models\Rol::all(),
+            'roles' => \App\Models\Rol::whereNotIn('rol', ['ADMIN', 'SUPER_ADMIN'])->get(),
             'secciones' => \App\Models\Seccion::with('instrumentos')->get(),
             'categorias' => \App\Models\Categoria::all(),
             'permisos' => \App\Models\Permiso::all(),
             'voces' => \App\Models\VozInstrumental::all(),
-             // ... others
+            'suscripcion' => $user->id_banda ? [
+                'plan' => $user->banda?->plan ?? 'BASIC',
+                'max_miembros' => $user->banda?->max_miembros ?? 15,
+                'uso_miembros' => \App\Models\Miembro::count(), // Scoped by BelongsToBanda trait
+                'pro_activo' => in_array(strtoupper($user->banda?->plan), ['PREMIUM', 'PRO', 'MONSTER'])
+            ] : null,
         ]);
     }
 
@@ -178,5 +228,70 @@ class AuthController extends Controller
         $user->save();
 
         return response()->json(['status' => 'ok']);
+    }
+
+    public function updateTheme(Request $request)
+    {
+        $request->validate(['theme' => 'required|in:light,dark,system']);
+        $user = $request->user();
+        $user->theme_preference = $request->theme;
+        $user->save();
+
+        return response()->json(['status' => 'ok']);
+    }
+
+    public function completeProfile(Request $request)
+    {
+        $user = auth()->user();
+        if (!$user->miembro) return response()->json(['message' => 'No profile found'], 404);
+
+        $request->validate([
+            'nombres' => 'required|string|max:50',
+            'apellidos' => 'required|string|max:50',
+            'ci' => 'required|string|max:20',
+            'celular' => 'required|string|max:15',
+            'password' => 'required|string|min:8|confirmed',
+            'latitud' => 'nullable|numeric',
+            'longitud' => 'nullable|numeric',
+            'direccion' => 'nullable|string',
+            'fecha' => 'nullable|date',
+            'has_emergency_contact' => 'nullable|boolean',
+            'contacto_nombre' => 'required_if:has_emergency_contact,true|string|max:100',
+            'contacto_celular' => 'required_if:has_emergency_contact,true|string|max:15',
+            'contacto_parentesco' => 'nullable|string|max:50',
+        ]);
+
+        return \Illuminate\Support\Facades\DB::transaction(function () use ($request, $user) {
+            $miembro = $user->miembro;
+
+            // Actualizar datos de miembro
+            $miembro->update($request->only([
+                'nombres', 'apellidos', 'ci', 'celular', 'latitud', 'longitud', 'direccion', 'fecha'
+            ]));
+
+            // Manejar contacto de emergencia
+            if ($request->has_emergency_contact) {
+                $miembro->contactos()->updateOrCreate(
+                    ['id_miembro' => $miembro->id_miembro],
+                    [
+                        'nombres_apellidos' => $request->contacto_nombre,
+                        'celular' => $request->contacto_celular,
+                        'parentesco' => $request->contacto_parentesco
+                    ]
+                );
+            }
+
+            // Actualizar usuario
+            $user->update([
+                'password' => Hash::make($request->password),
+                'password_changed' => true,
+                'profile_completed' => true
+            ]);
+
+            return response()->json([
+                'message' => 'Perfil configurado con éxito',
+                'user' => $user->load('miembro.rol', 'banda')
+            ]);
+        });
     }
 }

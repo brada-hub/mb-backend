@@ -5,12 +5,14 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 
+use App\Traits\BelongsToBanda;
+
 class Seccion extends Model
 {
-    use HasFactory;
+    use HasFactory, BelongsToBanda;
     protected $table = 'secciones';
     protected $primaryKey = 'id_seccion';
-    protected $fillable = ['seccion', 'descripcion', 'estado'];
+    protected $fillable = ['seccion', 'descripcion', 'estado', 'id_banda'];
     protected $casts = ['estado' => 'boolean'];
 
     public function miembros()

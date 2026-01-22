@@ -2,12 +2,14 @@
 
 namespace App\Models;
 
+use App\Traits\BelongsToBanda;
+
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 
 class Miembro extends Model
 {
-    use HasFactory;
+    use HasFactory, BelongsToBanda;
     protected $table = 'miembros';
     protected $primaryKey = 'id_miembro';
     protected $fillable = [
@@ -24,7 +26,8 @@ class Miembro extends Model
         'id_instrumento',
         'id_voz',
         'id_rol',
-        'version_perfil' // Added this field based on user request schema
+        'version_perfil',
+        'id_banda'
     ];
 
     public function user()
