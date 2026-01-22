@@ -180,10 +180,15 @@ class AuthController extends Controller
             'password_changed' => true
         ]);
 
-        // Revocar todas las sesiones para forzar re-login con nueva clave
-        $user->tokens()->delete();
+        // Solo revocar OTROS tokens, no el actual (para mantener la sesión viva)
+        $currentTokenId = $user->currentAccessToken()->id;
+        $user->tokens()->where('id', '!=', $currentTokenId)->delete();
 
-        return response()->json(['message' => 'Contraseña actualizada correctamente']);
+        return response()->json([
+            'message' => 'Contraseña actualizada correctamente',
+            'password_changed' => true,
+            'profile_completed' => $user->profile_completed
+        ]);
     }
 
     public function syncMasterData()
