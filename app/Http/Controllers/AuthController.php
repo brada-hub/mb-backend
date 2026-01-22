@@ -250,7 +250,7 @@ class AuthController extends Controller
             'apellidos' => 'required|string|max:50',
             'ci' => 'required|string|max:20',
             'celular' => 'required|string|max:15',
-            'password' => 'required|string|min:8|confirmed',
+            'password' => 'nullable|string|min:8|confirmed',
             'latitud' => 'nullable|numeric',
             'longitud' => 'nullable|numeric',
             'direccion' => 'nullable|string',
@@ -282,11 +282,16 @@ class AuthController extends Controller
             }
 
             // Actualizar usuario
-            $user->update([
-                'password' => Hash::make($request->password),
+            $updateData = [
                 'password_changed' => true,
                 'profile_completed' => true
-            ]);
+            ];
+
+            if ($request->filled('password')) {
+                $updateData['password'] = Hash::make($request->password);
+            }
+
+            $user->update($updateData);
 
             return response()->json([
                 'message' => 'Perfil configurado con éxito',
