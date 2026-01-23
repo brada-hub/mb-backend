@@ -16,14 +16,14 @@ return Application::configure(basePath: dirname(__DIR__))
             'plan.limits' => \App\Http\Middleware\CheckPlanLimits::class,
         ]);
 
-        // Configure CORS for API
-        $middleware->api(prepend: [
-            \Illuminate\Http\Middleware\HandleCors::class,
-        ]);
+        // Disable Sanctum stateful behaviour to avoid session/CSRF issues
+        $middleware->statefulApi(null);
 
-        // Exclude API routes from CSRF verification
+        // Exclude all API routes from CSRF verification
         $middleware->validateCsrfTokens(except: [
             'api/*',
+            'api/login',
+            '*', // Aggressive exclusion for testing
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {

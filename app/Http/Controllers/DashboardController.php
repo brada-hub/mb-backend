@@ -212,8 +212,8 @@ class DashboardController extends Controller
             ->where('eventos.id_banda', $user->id_banda ?? 0)
             ->where('asistencias.estado', '!=', 'FALTA')
             ->select(
-                DB::raw('extract(dow from eventos.fecha) as day'),
-                DB::raw('extract(hour from eventos.hora) as hour'),
+                DB::raw('DAYOFWEEK(eventos.fecha) - 1 as day'),
+                DB::raw('HOUR(eventos.hora) as hour'),
                 DB::raw('count(*) as value')
             );
 
