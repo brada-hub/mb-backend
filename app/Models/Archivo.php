@@ -24,20 +24,21 @@ class Archivo extends Model
             return str_replace(' ', '%20', $path);
         }
 
-        // 2. Quitamos slashes iniciales
+        // 2. Limpiamos el path
         $path = ltrim($path, '/');
 
-        // 3. Si no tiene 'storage/', se lo ponemos
-        if (!str_starts_with($path, 'storage/')) {
-            $path = 'storage/' . $path;
+        // Quitamos el prefijo storage/ si ya lo tiene para no duplicarlo luego
+        if (str_starts_with($path, 'storage/')) {
+            $path = substr($path, 8);
         }
 
-        // 4. Codificamos el nombre del archivo para que el navegador lo entienda
+        // 3. Codificamos el nombre del archivo (para espacios, acentos, eñes)
         $parts = explode('/', $path);
         $filename = array_pop($parts);
         $cleanPath = implode('/', $parts) . '/' . rawurlencode($filename);
 
-        return asset($cleanPath);
+        // 4. Forzamos el dominio de la API de producción
+        return 'https://api.simba.xpertiaplus.com/storage/' . ltrim($cleanPath, '/');
     }
 
     public function recurso()
