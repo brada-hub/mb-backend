@@ -8,6 +8,7 @@ use App\Models\Evento;
 use App\Models\Asistencia;
 use App\Models\ConvocatoriaEvento;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
 use Carbon\Carbon;
 
 class DashboardController extends Controller
@@ -15,14 +16,21 @@ class DashboardController extends Controller
     public function getStats()
     {
         $user = auth()->user();
-        // Assuming $user->miembro exists for all users who are not SuperAdmins and have a role.
-        // And $user->is_super_admin is a boolean flag.
-        // A musician is someone who has a miembro record and their role is not ADMIN or DIRECTOR, and they are not a super admin.
-        $isMusico = ($user->miembro && !in_array($user->miembro->rol?->rol, ['ADMIN', 'DIRECTOR'])) && !$user->is_super_admin;
+        $rol = strtoupper($user->miembro->rol->rol ?? '');
+        $isMusico = Str::contains($rol, 'MÚSICO') && !$user->is_super_admin;
+        $isJefe = Str::contains($rol, ['JEFE', 'DELEGADO']) && !$user->is_super_admin;
+        $isDirector = $rol === 'DIRECTOR' || $user->is_super_admin;
 
-        // 1. Miembros Totales (Solo Admin/SuperAdmin)
-        $totalMiembros = Miembro::count();
-        $miembrosEsteMes = Miembro::whereMonth('created_at', Carbon::now()->month)->count();
+        // 1. Miembros Totales
+        $queryMiembros = Miembro::query();
+        if ($isJefe) {
+            $queryMiembros->where('id_instrumento', $user->miembro->id_instrumento);
+        } elseif ($isMusico) {
+            $queryMiembros->where('id_miembro', $user->id_miembro);
+        }
+
+        $totalMiembros = $queryMiembros->count();
+        $miembrosEsteMes = $queryMiembros->whereMonth('created_at', Carbon::now()->month)->count();
 
         // 2. Próximos Eventos (Próximos 7 días)
         $proximosEventos = Evento::where('fecha', '>=', Carbon::today()->toDateString())
@@ -48,16 +56,21 @@ class DashboardController extends Controller
         if ($isMusico) {
             $queryConvocados->where('convocatoria_evento.id_miembro', $user->miembro->id_miembro);
             $queryPresentes->where('convocatoria_evento.id_miembro', $user->miembro->id_miembro);
+        } elseif ($isJefe) {
+            $queryConvocados->join('miembros', 'convocatoria_evento.id_miembro', '=', 'miembros.id_miembro')
+                           ->where('miembros.id_instrumento', $user->miembro->id_instrumento);
+            $queryPresentes->join('miembros', 'convocatoria_evento.id_miembro', '=', 'miembros.id_miembro')
+                           ->where('miembros.id_instrumento', $user->miembro->id_instrumento);
         }
 
         $totalConvocados = $queryConvocados->count();
         $totalPresentes = $queryPresentes->count();
         $asistenciaPromedio = $totalConvocados > 0 ? round(($totalPresentes / $totalConvocados) * 100) : 0;
 
-        // 5. Heatmap Data (Restringido para Músicos)
-        $heatmapData = $this->getHeatmapData($isMusico, $user);
+        // 5. Heatmap Data (Restringido para Músicos/Jefes)
+        $heatmapData = $this->getHeatmapData($isMusico, $user, $isJefe);
 
-        // 6. User Specific Data
+        // 6. User Specific Data (Sin cambios para eventos personales)
         $misEventos = collect();
         if ($user->miembro) {
             $misEventos = Evento::with('tipo')
@@ -83,21 +96,71 @@ class DashboardController extends Controller
                 });
         }
 
+        // 7. Personal Stats para Músicos
+        $miAsistencia = 0;
+        $miRacha = 0;
+        $miembrosSeccion = 0;
+
+        if ($user->miembro) {
+            // Calcular asistencia personal
+            $misConvocados = DB::table('convocatoria_evento')
+                ->join('eventos', 'convocatoria_evento.id_evento', '=', 'eventos.id_evento')
+                ->where('convocatoria_evento.id_miembro', $user->miembro->id_miembro)
+                ->where('eventos.fecha', '<', Carbon::today()->toDateString())
+                ->count();
+
+            $misPresentes = DB::table('asistencias')
+                ->join('convocatoria_evento', 'asistencias.id_convocatoria', '=', 'convocatoria_evento.id_convocatoria')
+                ->join('eventos', 'convocatoria_evento.id_evento', '=', 'eventos.id_evento')
+                ->where('convocatoria_evento.id_miembro', $user->miembro->id_miembro)
+                ->where('eventos.fecha', '<', Carbon::today()->toDateString())
+                ->whereIn('asistencias.estado', ['PUNTUAL', 'RETRASO'])
+                ->count();
+
+            $miAsistencia = $misConvocados > 0 ? round(($misPresentes / $misConvocados) * 100) : 0;
+
+            // Calcular racha personal
+            $misRecords = DB::table('convocatoria_evento')
+                ->join('eventos', 'convocatoria_evento.id_evento', '=', 'eventos.id_evento')
+                ->leftJoin('asistencias', 'convocatoria_evento.id_convocatoria', '=', 'asistencias.id_convocatoria')
+                ->where('convocatoria_evento.id_miembro', $user->miembro->id_miembro)
+                ->where('eventos.fecha', '<', Carbon::today()->toDateString())
+                ->select('asistencias.estado', 'eventos.fecha')
+                ->orderBy('eventos.fecha', 'desc')
+                ->get();
+
+            foreach ($misRecords as $rec) {
+                if (in_array($rec->estado, ['PUNTUAL', 'RETRASO'])) {
+                    $miRacha++;
+                } else {
+                    break;
+                }
+            }
+        }
+
+        // Miembros de sección para Jefe
+        if ($isJefe && $user->miembro) {
+            $miembrosSeccion = Miembro::where('id_instrumento', $user->miembro->id_instrumento)->count();
+        }
+
         return response()->json([
             'stats' => [
                 'miembros' => [
                     'total' => $isMusico ? 0 : $totalMiembros,
                     'nuevos_mes' => $isMusico ? 0 : $miembrosEsteMes
                 ],
+                'miembros_seccion' => $miembrosSeccion,
                 'eventos' => [
                     'hoy' => $eventosHoy,
                     'proximos' => $proximosEventos
                 ],
                 'asistencia' => [
                     'promedio' => $asistenciaPromedio,
-                    'promedio_mes' => $asistenciaPromedio // Simplificado por ahora
+                    'promedio_mes' => $asistenciaPromedio
                 ]
             ],
+            'mi_asistencia' => $miAsistencia,
+            'mi_racha' => $miRacha,
             'suscripcion' => $user->id_banda ? [
                 'plan' => $user->banda?->plan ?? 'BASIC',
                 'max_miembros' => $user->banda?->max_miembros ?? 15,
@@ -106,15 +169,19 @@ class DashboardController extends Controller
             ] : null,
             'heatmap' => $heatmapData,
             'mis_eventos' => $misEventos,
-            'top_streaks' => $isMusico ? [] : $this->calculateTopStreaks(),
-            'weekly' => $this->getWeeklyData($isMusico, $user)
+            'top_streaks' => $isMusico ? [] : $this->calculateTopStreaks($isJefe, $user),
+            'weekly' => $this->getWeeklyData($isMusico, $user, $isJefe)
         ]);
     }
 
-    private function calculateTopStreaks()
+    private function calculateTopStreaks($isJefe = false, $user = null)
     {
         // Get all member IDs
-        $miembros = Miembro::with('instrumento')->get();
+        $miembrosQuery = Miembro::with('instrumento');
+        if ($isJefe) {
+            $miembrosQuery->where('id_instrumento', $user->miembro->id_instrumento);
+        }
+        $miembros = $miembrosQuery->get();
         if ($miembros->isEmpty()) return [];
 
         // Pre-fetch all past assistances for these members to avoid N+1
@@ -159,7 +226,7 @@ class DashboardController extends Controller
         return array_slice($streaks, 0, 10);
     }
 
-    private function getWeeklyData($isMusico = false, $user = null)
+    private function getWeeklyData($isMusico = false, $user = null, $isJefe = false)
     {
         $startOfWeek = Carbon::now()->startOfWeek();
         $endOfWeek = Carbon::now()->endOfWeek();
@@ -172,6 +239,9 @@ class DashboardController extends Controller
 
         if ($isMusico && $user && $user->miembro) {
             $query->where('convocatoria_evento.id_miembro', $user->miembro->id_miembro);
+        } elseif ($isJefe) {
+            $query->join('miembros', 'convocatoria_evento.id_miembro', '=', 'miembros.id_miembro')
+                  ->where('miembros.id_instrumento', $user->miembro->id_instrumento);
         }
 
         $data = $query->select(
@@ -204,7 +274,7 @@ class DashboardController extends Controller
         return $weekly;
     }
 
-    private function getHeatmapData($isMusico = false, $user = null)
+    private function getHeatmapData($isMusico = false, $user = null, $isJefe = false)
     {
         $query = DB::table('asistencias')
             ->join('convocatoria_evento', 'asistencias.id_convocatoria', '=', 'convocatoria_evento.id_convocatoria')
@@ -219,6 +289,9 @@ class DashboardController extends Controller
 
         if ($isMusico && $user->miembro) {
             $query->where('convocatoria_evento.id_miembro', $user->miembro->id_miembro);
+        } elseif ($isJefe) {
+            $query->join('miembros', 'convocatoria_evento.id_miembro', '=', 'miembros.id_miembro')
+                  ->where('miembros.id_instrumento', $user->miembro->id_instrumento);
         }
 
         return $query->groupBy('day', 'hour')->get()->map(function($item) {

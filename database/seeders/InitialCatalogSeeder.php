@@ -40,14 +40,14 @@ class InitialCatalogSeeder extends Seeder
             'es_protegido' => true
         ]);
         $delegadoRole = Rol::create([
-            'rol' => 'DELEGADO / JEFE',
-            'descripcion' => 'CONTROL DE ASISTENCIAS, EVENTOS Y AGENDA',
+            'rol' => 'JEFE DE SECCIÓN',
+            'descripcion' => 'CONTROL DE MIEMBROS DE SU INSTRUMENTO',
             'id_banda' => $banda->id_banda,
             'es_protegido' => true
         ]);
         $miembroRole = Rol::create([
             'rol' => 'MÚSICO',
-            'descripcion' => 'SOLO LECTURA DE AGENDA, RECURSOS Y BIBLIOTECA',
+            'descripcion' => 'VISTA RESTRINGIDA A SU PERFIL Y AGENDA',
             'id_banda' => $banda->id_banda,
             'es_protegido' => true
         ]);
@@ -107,53 +107,106 @@ class InitialCatalogSeeder extends Seeder
         VozInstrumental::updateOrCreate(['nombre_voz' => '8VA VOZ']);
         VozInstrumental::updateOrCreate(['nombre_voz' => 'GENERAL']);
 
-        // 4. Create initial Admin Member & User
-        $adminMiembro = Miembro::create([
-            'id_categoria' => $catA->id_categoria,
-            'id_seccion' => $trompetaSeccionId,
-            'id_instrumento' => $trompetaId,
-            'id_voz' => $v2->id_voz, // 2da Voz
-            'id_rol' => $directorRole->id_rol,
-            'nombres' => 'ADMIN',
-            'apellidos' => 'MONSTER',
-            'ci' => '0000000',
-            'celular' => '70000000',
-            'direccion' => 'SEDE CENTRAL',
-            'id_banda' => $banda->id_banda
-        ]);
+        // 4. CREACIÓN DE USUARIOS DE PRUEBA (Credenciales = Usuario)
 
-        User::create([
-            'user' => 'admin',
-            'password' => Hash::make('admin'),
-            'id_miembro' => $adminMiembro->id_miembro,
-            'estado' => true,
-            'password_changed' => true,
-            'id_banda' => $banda->id_banda,
-            'is_super_admin' => false
-        ]);
+        // A. SUPER ADMIN (Dueño del SaaS - NO tiene miembro, NO pertenece a ninguna banda)
+        User::updateOrCreate(
+            ['user' => 'admin'],
+            [
+                'password' => Hash::make('admin'),
+                'id_miembro' => null, // SuperAdmin NO tiene perfil de miembro
+                'estado' => true,
+                'password_changed' => true,
+                'id_banda' => null, // NO pertenece a ninguna banda
+                'is_super_admin' => true
+            ]
+        );
 
-        // Director for web testing
-        $directorMiembro = Miembro::create([
-            'id_categoria' => $catA->id_categoria,
-            'id_seccion' => $trompetaSeccionId,
-            'id_instrumento' => $trompetaId,
-            'id_voz' => $v2->id_voz, // 2da Voz
-            'id_rol' => $directorRole->id_rol,
-            'nombres' => 'DIRECTOR',
-            'apellidos' => 'GENERAL',
-            'ci' => '1111111',
-            'celular' => '71111111',
-            'direccion' => 'SEDE CENTRAL',
-            'id_banda' => $banda->id_banda
-        ]);
+        // B. DIRECTOR (Dueño de su Banda)
+        $directorMiembro = Miembro::firstOrCreate(
+            ['ci' => '1111111'],
+            [
+                'id_categoria' => $catA->id_categoria,
+                'id_seccion' => $trompetaSeccionId,
+                'id_instrumento' => $trompetaId,
+                'id_voz' => $v1->id_voz,
+                'id_rol' => $directorRole->id_rol,
+                'nombres' => 'DIRECTOR',
+                'apellidos' => 'BANDA',
+                'celular' => '71111111',
+                'direccion' => 'CENTRO',
+                'id_banda' => $banda->id_banda
+            ]
+        );
 
-        User::create([
-            'user' => 'director',
-            'password' => Hash::make('director'),
-            'id_miembro' => $directorMiembro->id_miembro,
-            'estado' => true,
-            'password_changed' => true,
-            'id_banda' => $banda->id_banda
-        ]);
+        User::updateOrCreate(
+            ['user' => 'director'],
+            [
+                'password' => Hash::make('director'),
+                'id_miembro' => $directorMiembro->id_miembro,
+                'estado' => true,
+                'password_changed' => true,
+                'id_banda' => $banda->id_banda,
+                'is_super_admin' => false
+            ]
+        );
+
+        // C. JEFE DE SECCIÓN (Visualiza su instrumento)
+        $jefeMiembro = Miembro::firstOrCreate(
+            ['ci' => '2222222'],
+            [
+                'id_categoria' => $catB->id_categoria,
+                'id_seccion' => $trompetaSeccionId,
+                'id_instrumento' => $trompetaId,
+                'id_voz' => $v1->id_voz,
+                'id_rol' => $delegadoRole->id_rol,
+                'nombres' => 'JEFE',
+                'apellidos' => 'SECCIÓN',
+                'celular' => '72222222',
+                'direccion' => 'ZONA SUR',
+                'id_banda' => $banda->id_banda
+            ]
+        );
+
+        User::updateOrCreate(
+            ['user' => 'jefeseccion'],
+            [
+                'password' => Hash::make('jefeseccion'),
+                'id_miembro' => $jefeMiembro->id_miembro,
+                'estado' => true,
+                'password_changed' => true,
+                'id_banda' => $banda->id_banda,
+                'is_super_admin' => false
+            ]
+        );
+
+        // D. MIEMBRO (Solo visualiza su perfil/asistencia)
+        $miembroUserRecord = Miembro::firstOrCreate(
+            ['ci' => '3333333'],
+            [
+                'id_categoria' => $catC->id_categoria,
+                'id_seccion' => $trompetaSeccionId,
+                'id_instrumento' => $trompetaId,
+                'id_voz' => $v3->id_voz,
+                'id_rol' => $miembroRole->id_rol,
+                'nombres' => 'MÚSICO',
+                'apellidos' => 'BASE',
+                'celular' => '73333333',
+                'direccion' => 'ZONA NORTE',
+                'id_banda' => $banda->id_banda
+            ]
+        );
+
+        User::updateOrCreate(
+            ['user' => 'miembro'],
+            [
+                'password' => Hash::make('miembro'),
+                'id_miembro' => $miembroUserRecord->id_miembro,
+                'estado' => true,
+                'password_changed' => true,
+                'id_banda' => $banda->id_banda,
+                'is_super_admin' => false
+            ]
+        );
     }
 }

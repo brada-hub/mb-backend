@@ -80,6 +80,37 @@ class RecursoController extends Controller
                 'id_voz' => $request->id_voz
             ]);
 
+            // VALIDAR CAPACIDAD DE ALMACENAMIENTO (MB)
+            $banda = auth()->user()->banda;
+            if ($banda) {
+                $totalIncomingBytes = 0;
+                $files = array_filter([
+                    ...($request->file('new_archivos') ?? []),
+                    ...($request->file('archivos') ?? []),
+                    $request->file('archivo'),
+                    $request->file('audio_guia')
+                ]);
+
+                foreach ($files as $f) {
+                    $totalIncomingBytes += $f->getSize();
+                }
+
+                if (!$banda->hasStorageCapacity($totalIncomingBytes)) {
+                    DB::rollBack();
+                    return response()->json([
+                        'message' => 'Límite de almacenamiento alcanzado. Por favor, amplía tu plan.',
+                        'current_usage' => $banda->getCurrentStorageMb() . ' MB',
+                        'limit' => ($banda->subscriptionPlan->storage_mb ?? 100) . ' MB'
+                    ], 403);
+                }
+
+                // VALIDAR CARGA DE AUDIO
+                if ($request->hasFile('audio_guia') && !$banda->canUploadAudio()) {
+                    DB::rollBack();
+                    return response()->json(['message' => 'Tu plan actual no permite la carga de archivos de audio.'], 403);
+                }
+            }
+
             // Handle Files (Archivos)
             $filesToProcess = [];
             if ($request->hasFile('new_archivos')) {

@@ -113,6 +113,20 @@ class EventoController extends Controller
             $data['evento'] = mb_strtoupper($data['evento'], 'UTF-8');
             $data['estado'] = true;
 
+            // ENFORCEMENT DE PLAN (SaaS)
+            $banda = auth()->user()->banda;
+            if ($banda) {
+                if (((isset($data['latitud']) && $data['latitud']) || (isset($data['longitud']) && $data['longitud'])) && !$banda->canUseGps()) {
+                    return response()->json(['message' => 'Tu plan actual no incluye el control de asistencia por GPS.'], 403);
+                }
+
+                $esRemunerado = $data['remunerado'] ?? false;
+                $canRemunerate = $banda->subscriptionPlan->can_upload_video ?? false; // Usamos video/PRO como proxy
+                if ($esRemunerado && !$canRemunerate) {
+                    return response()->json(['message' => 'La gestión de remuneraciones solo está disponible en el Plan Profesional.'], 403);
+                }
+            }
+
             $evento = Evento::create($data);
 
             // Logic for Requerimientos

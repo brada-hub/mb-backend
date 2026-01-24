@@ -2,12 +2,13 @@
 
 namespace App\Models;
 
+use App\Traits\Auditable;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 
 class Archivo extends Model
 {
-    use HasFactory;
+    use HasFactory, Auditable;
 
     protected $primaryKey = 'id_archivo';
     protected $fillable = ['url_archivo', 'tipo', 'nombre_original', 'orden', 'id_recurso'];

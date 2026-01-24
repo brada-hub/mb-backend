@@ -9,9 +9,11 @@ use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Laravel\Sanctum\HasApiTokens;
 
+use App\Traits\Auditable;
+
 class User extends Authenticatable
 {
-    use HasApiTokens, HasFactory, Notifiable;
+    use HasApiTokens, HasFactory, Notifiable, Auditable;
 
     protected $primaryKey = 'id_user';
 
@@ -28,7 +30,8 @@ class User extends Authenticatable
         'preferencias_notificaciones',
         'fcm_token',
         'theme_preference',
-        'id_banda'
+        'id_banda',
+        'original_banda_id'
     ];
 
     protected $hidden = [

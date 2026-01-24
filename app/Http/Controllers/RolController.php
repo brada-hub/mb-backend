@@ -17,6 +17,8 @@ class RolController extends Controller
 
     public function store(Request $request)
     {
+        if (!auth()->user()->is_super_admin) abort(403, 'Solo el administrador global puede gestionar roles.');
+
         $validated = $request->validate([
             'rol' => 'required|string|max:255',
             'descripcion' => 'nullable|string',
@@ -26,7 +28,7 @@ class RolController extends Controller
         $rol = Rol::create([
             'rol' => mb_strtoupper($validated['rol'], 'UTF-8'),
             'descripcion' => $validated['descripcion'] ? mb_strtoupper($validated['descripcion'], 'UTF-8') : null,
-            'es_protegido' => false // Solo SuperAdmin puede crear protegidos vía seeder
+            'es_protegido' => false
         ]);
 
         if (isset($validated['permisos'])) {
@@ -45,6 +47,8 @@ class RolController extends Controller
 
     public function update(Request $request, string $id)
     {
+        if (!auth()->user()->is_super_admin) abort(403);
+
         $rol = Rol::findOrFail($id);
 
         if ($rol->es_protegido) {
@@ -76,6 +80,8 @@ class RolController extends Controller
 
     public function destroy(string $id)
     {
+        if (!auth()->user()->is_super_admin) abort(403);
+
         $rol = Rol::findOrFail($id);
 
         if ($rol->es_protegido) {

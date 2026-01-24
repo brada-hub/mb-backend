@@ -4,9 +4,14 @@ namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
 use App\Models\Banda;
+use App\Models\Plan;
 use App\Models\User;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
+use App\Models\AuditLog;
+use App\Models\Archivo;
+use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Facades\DB;
 
 class SuperAdminController extends Controller
 {
@@ -29,7 +34,7 @@ class SuperAdminController extends Controller
     public function listBandas()
     {
         // Obtener todas las bandas directamente (Banda no tiene BelongsToBanda trait)
-        $bandas = Banda::orderBy('created_at', 'desc')->get();
+        $bandas = Banda::withoutGlobalScopes()->with('subscriptionPlan')->orderBy('created_at', 'desc')->get();
 
         // Agregar conteos manualmente sin global scopes
         $bandas->each(function($banda) {
@@ -53,7 +58,8 @@ class SuperAdminController extends Controller
             'color_secundario' => 'nullable|string|max:50',
             'admin_user' => 'nullable|string',
             'admin_password' => 'nullable|string|min:1',
-            'plan' => 'nullable|string|in:BASIC,PREMIUM,PRO',
+            'plan' => 'nullable|string',
+            'id_plan' => 'nullable|exists:plans,id_plan',
             'max_miembros' => 'nullable|integer',
             'cuota_mensual' => 'nullable|numeric',
             'logo' => 'nullable|image|max:2048'
@@ -86,10 +92,11 @@ class SuperAdminController extends Controller
                 'color_secundario' => $request->color_secundario ?? '#161b2c',
                 'estado' => true,
                 'plan' => $request->plan ?? 'BASIC',
-                'max_miembros' => $request->max_miembros ?? ($request->plan == 'PREMIUM' ? 100 : 15),
+                'id_plan' => $request->id_plan ?? Plan::where('nombre', 'BASIC')->first()->id_plan,
+                'max_miembros' => $request->max_miembros ?? (Plan::find($request->id_plan)->max_miembros ?? 15),
                 'cuota_mensual' => $request->cuota_mensual ?? 0,
                 'fecha_vencimiento' => now()->addMonth(), // Un mes de prueba por defecto
-                'notificaciones_habilitadas' => $request->plan != 'BASIC'
+                'notificaciones_habilitadas' => true
             ]);
             $banda->saveQuietly();
 
@@ -217,11 +224,24 @@ class SuperAdminController extends Controller
             'nombre' => 'required|string|max:100',
             'color_primario' => 'nullable|string|max:20',
             'color_secundario' => 'nullable|string|max:20',
+            'plan' => 'nullable|string|max:20',
+            'id_plan' => 'nullable|exists:plans,id_plan',
+            'max_miembros' => 'nullable|integer',
+            'cuota_mensual' => 'nullable|numeric',
             'estado' => 'boolean',
             'logo' => 'nullable|image|max:2048'
         ]);
 
-        $data = $request->only(['nombre', 'color_primario', 'color_secundario', 'estado']);
+        $data = $request->only([
+            'nombre',
+            'color_primario',
+            'color_secundario',
+            'plan',
+            'id_plan',
+            'max_miembros',
+            'cuota_mensual',
+            'estado'
+        ]);
 
         if ($request->hasFile('logo')) {
             // Borrar anterior si existe
@@ -286,13 +306,14 @@ class SuperAdminController extends Controller
                 'nuevos_musicos_mes' => \App\Models\Miembro::withoutGlobalScopes()->whereMonth('created_at', now()->month)->count(),
                 'nuevos_eventos_mes' => \App\Models\Evento::withoutGlobalScopes()->whereMonth('created_at', now()->month)->count()
             ],
-            'salud_suscripciones' => [
-                'BASIC' => Banda::withoutGlobalScopes()->where('plan', 'BASIC')->count(),
-                'PREMIUM' => Banda::withoutGlobalScopes()->where('plan', 'PREMIUM')->count(),
-                'PRO' => Banda::withoutGlobalScopes()->where('plan', 'PRO')->count(),
-                'por_vencer' => Banda::withoutGlobalScopes()->where('fecha_vencimiento', '<=', now()->addDays(7))->count(),
-                'limite_alcanzado' => Banda::withoutGlobalScopes()->whereRaw('id_banda IN (SELECT id_banda FROM miembros GROUP BY id_banda HAVING COUNT(*) >= bandas.max_miembros)')->count()
-            ]
+            'salud_suscripciones' => Banda::withoutGlobalScopes()
+            ->join('plans', 'bandas.id_plan', '=', 'plans.id_plan')
+            ->select('plans.nombre as plan', DB::raw('count(*) as total'))
+            ->groupBy('plans.nombre')
+            ->pluck('total', 'plan')
+            ->toArray(),
+            'por_vencer' => Banda::withoutGlobalScopes()->where('fecha_vencimiento', '<=', now()->addDays(7))->count(),
+            'limite_alcanzado' => Banda::withoutGlobalScopes()->whereRaw('id_banda IN (SELECT id_banda FROM miembros GROUP BY id_banda HAVING COUNT(*) >= bandas.max_miembros)')->count()
         ]);
     }
 
@@ -318,8 +339,8 @@ class SuperAdminController extends Controller
         $user = auth()->user();
 
         // Guardamos el id_banda original (si no estamos ya impersonando)
-        if (!$user->original_banda_id) {
-            $user->original_banda_id = $user->id_banda ?? -1; // -1 indica que venía de "sin banda" (SuperAdmin puro)
+        if (is_null($user->original_banda_id)) {
+            $user->original_banda_id = $user->id_banda ?? 0; // 0 indica que venía de "sin banda" (SuperAdmin puro)
         }
 
         $user->id_banda = $banda->id_banda;
@@ -335,8 +356,8 @@ class SuperAdminController extends Controller
     public function stopImpersonating()
     {
         $user = auth()->user();
-        if ($user->original_banda_id) {
-            $user->id_banda = $user->original_banda_id === -1 ? null : $user->original_banda_id;
+        if (!is_null($user->original_banda_id)) {
+            $user->id_banda = $user->original_banda_id === 0 ? null : $user->original_banda_id;
             $user->original_banda_id = null;
             $user->save();
         }
@@ -345,5 +366,127 @@ class SuperAdminController extends Controller
             'message' => 'Volviste al modo Administrador Monster',
             'user' => $user->load('banda')
         ]);
+    }
+
+    /**
+     * Obtener logs de auditoría globales
+     */
+    public function getAuditLogs(Request $request)
+    {
+        $query = AuditLog::with(['user', 'banda'])->latest();
+
+        if ($request->id_banda) {
+            $query->where('id_banda', $request->id_banda);
+        }
+
+        if ($request->event) {
+            $query->where('event', $request->event);
+        }
+
+        return response()->json($query->paginate(50));
+    }
+
+    /**
+     * Reporte detallado de uso de disco por banda
+     */
+    public function getStorageReport()
+    {
+        $bandas = Banda::withoutGlobalScopes()->with('subscriptionPlan')->get();
+
+        $report = $bandas->map(function($banda) {
+            // Calculamos archivos de recursos (Partituras, Audios)
+            $archivos = Archivo::whereHas('recurso.tema', function($q) use ($banda) {
+                $q->where('id_banda', $banda->id_banda);
+            })->get();
+
+            $totalBytes = 0;
+            foreach ($archivos as $archivo) {
+                $path = str_replace('/storage/', '', $archivo->url_archivo);
+                if (Storage::disk('public')->exists($path)) {
+                    $totalBytes += Storage::disk('public')->size($path);
+                }
+            }
+
+            if ($banda->logo && Storage::disk('public')->exists($banda->logo)) {
+                $totalBytes += Storage::disk('public')->size($banda->logo);
+            }
+
+            $limitMb = $banda->subscriptionPlan->storage_mb ?? 100;
+            $currentMb = round($totalBytes / 1024 / 1024, 2);
+
+            return [
+                'id_banda' => $banda->id_banda,
+                'nombre' => $banda->nombre,
+                'plan' => $banda->subscriptionPlan->label ?? $banda->plan,
+                'current_mb' => $currentMb,
+                'limit_mb' => $limitMb,
+                'percent' => $limitMb > 0 ? round(($currentMb / $limitMb) * 100, 1) : 0,
+                'status' => $currentMb > $limitMb ? 'OVER_LIMIT' : ($currentMb > ($limitMb * 0.9) ? 'WARNING' : 'OK')
+            ];
+        });
+
+        return response()->json($report);
+    }
+
+    public function listPlans()
+    {
+        return response()->json(Plan::all());
+    }
+
+    public function storePlan(Request $request)
+    {
+        $data = $request->validate([
+            'nombre' => 'required|string|unique:plans,nombre',
+            'label' => 'required|string',
+            'max_miembros' => 'required|integer',
+            'storage_mb' => 'required|integer',
+            'can_upload_audio' => 'boolean',
+            'can_upload_video' => 'boolean',
+            'gps_attendance' => 'boolean',
+            'custom_branding' => 'boolean',
+            'precio_base' => 'numeric',
+            'features' => 'nullable|array'
+        ]);
+
+        $plan = Plan::create($data);
+        return response()->json($plan, 201);
+    }
+
+    public function updatePlan(Request $request, $id)
+    {
+        $plan = Plan::findOrFail($id);
+        $data = $request->validate([
+            'nombre' => 'string|unique:plans,nombre,' . $id . ',id_plan',
+            'label' => 'string',
+            'max_miembros' => 'integer',
+            'storage_mb' => 'integer',
+            'can_upload_audio' => 'boolean',
+            'can_upload_video' => 'boolean',
+            'gps_attendance' => 'boolean',
+            'custom_branding' => 'boolean',
+            'precio_base' => 'numeric',
+            'features' => 'nullable|array'
+        ]);
+
+        $plan->update($data);
+
+        // Sincronizar el límite de miembros en todas las bandas que tienen este plan
+        if (isset($data['max_miembros'])) {
+            Banda::withoutGlobalScopes()
+                ->where('id_plan', $plan->id_plan)
+                ->update(['max_miembros' => $plan->max_miembros]);
+        }
+
+        return response()->json($plan);
+    }
+
+    public function deletePlan($id)
+    {
+        $plan = Plan::findOrFail($id);
+        if ($plan->bandas()->exists()) {
+            return response()->json(['message' => 'No se puede eliminar un plan que tiene bandas asociadas.'], 400);
+        }
+        $plan->delete();
+        return response()->json(['message' => 'Plan eliminado correctamente.']);
     }
 }

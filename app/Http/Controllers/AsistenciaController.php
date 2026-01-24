@@ -6,6 +6,7 @@ use Illuminate\Http\Request;
 use App\Models\Asistencia;
 use App\Models\Evento;
 use App\Models\ConvocatoriaEvento;
+use Illuminate\Support\Str;
 use Carbon\Carbon;
 
 class AsistenciaController extends Controller
@@ -247,7 +248,7 @@ class AsistenciaController extends Controller
         $miMiembro = $user->miembro;
         $role = strtoupper($miMiembro->rol->rol ?? '');
 
-        if ($role === 'JEFE DE SECCION' || str_contains($role, 'JEFE')) {
+        if (Str::contains($role, ['JEFE', 'DELEGADO'])) {
             // 1. Solo puede marcar a gente de su instrumento
             if ($convocatoria->miembro->id_instrumento !== $miMiembro->id_instrumento && $role !== 'ADMIN') {
                 return response()->json(['message' => 'Solo puedes marcar asistencia a integrantes de tu instrumento.'], 403);
@@ -257,6 +258,10 @@ class AsistenciaController extends Controller
             if ($request->estado === 'JUSTIFICADO' && $role !== 'ADMIN' && $role !== 'DIRECTOR') {
                  return response()->json(['message' => 'Solo el Director o Administrador pueden otorgar permisos (Justificados).'], 403);
             }
+        }
+
+        if (Str::contains($role, 'MÚSICO') && $role !== 'ADMIN' && $role !== 'DIRECTOR') {
+            return response()->json(['message' => 'No tienes permisos para realizar marcados manuales.'], 403);
         }
 
         // 2. Protección GPS Universal: Ni director ni jefes pueden cambiar un marcado GPS legal, solo ADMIN
@@ -322,6 +327,10 @@ class AsistenciaController extends Controller
         $user = auth()->user();
         $miMiembro = $user->miembro;
         $miRole = strtoupper($miMiembro->rol->rol ?? '');
+
+        if (Str::contains($miRole, 'MÚSICO') && $miRole !== 'ADMIN' && $miRole !== 'DIRECTOR') {
+            return response()->json(['message' => 'No tienes permisos para realizar marcados masivos.'], 403);
+        }
 
         $fechaStr = ($evento->fecha instanceof Carbon) ? $evento->fecha->format('Y-m-d') : $evento->fecha;
         $horaEvento = Carbon::parse($fechaStr . ' ' . $evento->hora, 'America/La_Paz');

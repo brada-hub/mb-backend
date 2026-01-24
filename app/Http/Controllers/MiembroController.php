@@ -17,7 +17,33 @@ class MiembroController extends Controller
      */
     public function index()
     {
-        return Miembro::with(['categoria', 'seccion', 'instrumento', 'voz', 'rol.permisos', 'user', 'contactos', 'permisos'])->get();
+        $user = auth()->user();
+        $query = Miembro::with(['categoria', 'seccion', 'instrumento', 'voz', 'rol.permisos', 'user', 'contactos', 'permisos']);
+
+        // 1. Si es SuperAdmin (Admin Global), no aplicamos más filtros
+        if ($user->isSuperAdmin() && empty($user->id_banda)) {
+            return $query->get();
+        }
+
+        // NUEVO: Excluir SuperAdmins de la lista para usuarios normales
+        $query->whereHas('user', function($q) {
+            $q->where('is_super_admin', false)->orWhereNull('is_super_admin');
+        });
+
+        $rol = ($user->miembro->rol->rol ?? '') ? strtoupper($user->miembro->rol->rol) : '';
+
+        // 2. Si es Jefe de Sección (Delegado/Jefe)
+        if (Str::contains($rol, ['JEFE', 'DELEGADO'])) {
+            $query->where('id_instrumento', $user->miembro->id_instrumento);
+        }
+
+        // 3. Si es Músico
+        if (Str::contains($rol, 'MÚSICO')) {
+            $query->where('id_miembro', $user->id_miembro);
+        }
+
+        // 4. Si es Director, no filtramos más (ve toda la banda por el scope global)
+        return $query->get();
     }
 
     /**

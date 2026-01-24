@@ -130,5 +130,13 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::post('/bandas/{id}/admin', [\App\Http\Controllers\SuperAdminController::class, 'createBandaAdmin']);
         Route::post('/impersonate/{id}', [\App\Http\Controllers\SuperAdminController::class, 'impersonateBanda']);
         Route::post('/stop-impersonate', [\App\Http\Controllers\SuperAdminController::class, 'stopImpersonating']);
+        Route::get('/audit-logs', [\App\Http\Controllers\SuperAdminController::class, 'getAuditLogs']);
+        Route::get('/storage-report', [\App\Http\Controllers\SuperAdminController::class, 'getStorageReport']);
+
+        // Gestión de Planes
+        Route::get('/plans', [\App\Http\Controllers\SuperAdminController::class, 'listPlans']);
+        Route::post('/plans', [\App\Http\Controllers\SuperAdminController::class, 'storePlan']);
+        Route::put('/plans/{id}', [\App\Http\Controllers\SuperAdminController::class, 'updatePlan']);
+        Route::delete('/plans/{id}', [\App\Http\Controllers\SuperAdminController::class, 'deletePlan']);
     });
 });
