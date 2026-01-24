@@ -20,7 +20,7 @@ class Genero extends Model
         if (!$this->banner_opcional) return null;
 
         if (str_starts_with($this->banner_opcional, 'http')) {
-            return $this->banner_opcional;
+            return str_replace(' ', '%20', $this->banner_opcional);
         }
 
         return asset('storage/' . $this->banner_opcional);

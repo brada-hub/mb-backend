@@ -16,8 +16,15 @@ class Archivo extends Model
     public function getUrlArchivoAttribute($value)
     {
         if (!$value) return null;
-        if (str_starts_with($value, 'http')) return $value;
-        return asset($value);
+
+        // Si ya es una URL completa, nos aseguramos de codificar los espacios
+        if (str_starts_with($value, 'http')) {
+            // Reemplazamos espacios por %20 manualmente para evitar fallos del navegador
+            return str_replace(' ', '%20', $value);
+        }
+
+        // Si es ruta relativa, asset() se encarga de codificarla correctamente
+        return asset(ltrim($value, '/'));
     }
 
     public function recurso()
