@@ -123,12 +123,16 @@ class RecursoController extends Controller
             }
 
             foreach ($filesToProcess as $index => $file) {
-                $path = $file->store('recursos', 'public');
-                $tipo = $file->getClientOriginalExtension() === 'pdf' ? 'pdf' : 'imagen';
+                // Generamos un nombre limpio y único para evitar problemas con espacios o caracteres raros
+                $extension = $file->getClientOriginalExtension();
+                $cleanName = time() . '_' . $index . '.' . $extension;
+
+                $path = $file->storeAs('recursos', $cleanName, 'public');
+                $tipo = in_array($extension, ['pdf']) ? 'pdf' : 'imagen';
 
                 Archivo::create([
                     'id_recurso' => $recurso->id_recurso,
-                    'url_archivo' => Storage::url($path),
+                    'url_archivo' => 'storage/' . $path, // Guardamos ruta relativa estándar
                     'tipo' => $tipo,
                     'nombre_original' => $file->getClientOriginalName(),
                     'orden' => $index + 1
