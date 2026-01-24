@@ -24,7 +24,7 @@ class ImportFilesCommand extends Command
 
         // 2. Buscamos un instrumento por defecto (Ej: Trompeta) para asignar las partituras
         // Si quieres cambiarlos luego, puedes editarlos en el panel
-        $instrumentoDefault = Instrumento::where('nombre_instrumento', 'LIKE', '%TROMPETA%')->first()
+        $instrumentoDefault = Instrumento::where('instrumento', 'LIKE', '%TROMPETA%')->first()
                              ?? Instrumento::first();
 
         if (!$instrumentoDefault) {
