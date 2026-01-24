@@ -13,32 +13,31 @@ class Archivo extends Model
     protected $primaryKey = 'id_archivo';
     protected $fillable = ['url_archivo', 'tipo', 'nombre_original', 'orden', 'id_recurso'];
 
+    /**
+     * Accesor ultra-agresivo para forzar la ruta correcta en producción.
+     * Ignora rutas viejas y subdominios incorrectos.
+     */
     public function getUrlArchivoAttribute($value)
     {
         if (!$value) return null;
 
-        $path = $value;
+        // 1. Extraemos solo el nombre real del archivo (el final de la ruta)
+        $pathParts = explode('/', str_replace('\\', '/', $value));
+        $filename = end($pathParts);
 
-        // 1. Si ya es una URL completa
-        if (str_starts_with($path, 'http')) {
-            return str_replace(' ', '%20', $path);
+        // 2. Determinamos la carpeta correcta (guias o recursos)
+        // Por defecto recursos, a menos que el nombre o la ruta original sugieran que es una guía
+        $folder = 'recursos';
+        if (stripos($value, 'guias') !== false || stripos($value, 'audio') !== false) {
+            $folder = 'guias';
         }
 
-        // 2. Limpiamos el path
-        $path = ltrim($path, '/');
+        // 3. Codificamos el nombre del archivo para la web (espacios -> %20, etc.)
+        $encodedFilename = rawurlencode($filename);
 
-        // Quitamos el prefijo storage/ si ya lo tiene para no duplicarlo luego
-        if (str_starts_with($path, 'storage/')) {
-            $path = substr($path, 8);
-        }
-
-        // 3. Codificamos el nombre del archivo (para espacios, acentos, eñes)
-        $parts = explode('/', $path);
-        $filename = array_pop($parts);
-        $cleanPath = implode('/', $parts) . '/' . rawurlencode($filename);
-
-        // 4. Forzamos el dominio de la API de producción
-        return 'https://api.simba.xpertiaplus.com/storage/' . ltrim($cleanPath, '/');
+        // 4. RETORNO FORZADO: No usamos asset() ni rutas relativas.
+        // Forzamos el dominio de la API y la carpeta donde moviste los archivos.
+        return "https://api.simba.xpertiaplus.com/storage/{$folder}/{$encodedFilename}";
     }
 
     public function recurso()
