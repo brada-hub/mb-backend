@@ -17,14 +17,27 @@ class Archivo extends Model
     {
         if (!$value) return null;
 
-        // Si ya es una URL completa, nos aseguramos de codificar los espacios
-        if (str_starts_with($value, 'http')) {
-            // Reemplazamos espacios por %20 manualmente para evitar fallos del navegador
-            return str_replace(' ', '%20', $value);
+        $path = $value;
+
+        // 1. Si ya es una URL completa
+        if (str_starts_with($path, 'http')) {
+            return str_replace(' ', '%20', $path);
         }
 
-        // Si es ruta relativa, asset() se encarga de codificarla correctamente
-        return asset(ltrim($value, '/'));
+        // 2. Quitamos slashes iniciales
+        $path = ltrim($path, '/');
+
+        // 3. Si no tiene 'storage/', se lo ponemos
+        if (!str_starts_with($path, 'storage/')) {
+            $path = 'storage/' . $path;
+        }
+
+        // 4. Codificamos el nombre del archivo para que el navegador lo entienda
+        $parts = explode('/', $path);
+        $filename = array_pop($parts);
+        $cleanPath = implode('/', $parts) . '/' . rawurlencode($filename);
+
+        return asset($cleanPath);
     }
 
     public function recurso()
