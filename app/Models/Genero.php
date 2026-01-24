@@ -23,12 +23,7 @@ class Genero extends Model
             return $this->banner_opcional;
         }
 
-        // Devolvemos ruta relativa para que el frontend pueda usar el proxy y evitar problemas de hostname (monster-back)
-        if (str_starts_with($this->banner_opcional, 'genres/')) {
-            return '/' . $this->banner_opcional;
-        }
-
-        return '/storage/' . $this->banner_opcional;
+        return asset('storage/' . $this->banner_opcional);
     }
 
     public function temas()

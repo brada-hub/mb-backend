@@ -13,6 +13,13 @@ class Archivo extends Model
     protected $primaryKey = 'id_archivo';
     protected $fillable = ['url_archivo', 'tipo', 'nombre_original', 'orden', 'id_recurso'];
 
+    public function getUrlArchivoAttribute($value)
+    {
+        if (!$value) return null;
+        if (str_starts_with($value, 'http')) return $value;
+        return asset($value);
+    }
+
     public function recurso()
     {
         return $this->belongsTo(Recurso::class, 'id_recurso');
