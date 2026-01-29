@@ -82,6 +82,55 @@ class EventoController extends Controller
                      ->get();
     }
 
+    public function proximasConvocatorias() {
+        $user = auth()->user();
+        $miembro = $user->miembro;
+        $esJefe = $miembro && $miembro->rol?->rol === 'JEFE DE SECCIÓN';
+        $miInstrumentoId = $miembro?->id_instrumento;
+
+        $eventos = Evento::with(['tipo', 'requerimientos.instrumento', 'convocatorias.miembro'])
+            ->where('fecha', '>=', now()->toDateString())
+            ->where('estado', true)
+            ->whereHas('requerimientos')
+            ->orderBy('fecha', 'asc')
+            ->get();
+
+        // Calcular resumen para el frontend
+        $eventos->map(function($ev) use ($esJefe, $miInstrumentoId) {
+            $totalNecesario = $ev->requerimientos->sum('cantidad_necesaria');
+            $totalConvocado = $ev->convocatorias->count();
+
+            $ev->meta_formacion = [
+                'total_necesario' => $totalNecesario,
+                'total_convocado' => $totalConvocado,
+                'completado' => $totalNecesario > 0 ? ($totalConvocado >= $totalNecesario) : true,
+                'porcentaje' => $totalNecesario > 0 ? round(($totalConvocado / $totalNecesario) * 100) : 100
+            ];
+
+            // Si es Jefe de Sección, añadir su estado específico
+            if ($esJefe && $miInstrumentoId) {
+                $reqSeccion = $ev->requerimientos->where('id_instrumento', $miInstrumentoId)->first();
+                if ($reqSeccion) {
+                    $convocadosSeccion = $ev->convocatorias->filter(function($c) use ($miInstrumentoId) {
+                        return $c->miembro?->id_instrumento == $miInstrumentoId;
+                    })->count();
+
+                    $ev->mi_seccion_status = [
+                        'instrumento' => $reqSeccion->instrumento?->instrumento,
+                        'total' => $reqSeccion->cantidad_necesaria,
+                        'convocados' => $convocadosSeccion,
+                        'completado' => $convocadosSeccion >= $reqSeccion->cantidad_necesaria
+                    ];
+                }
+            }
+
+            unset($ev->convocatorias); // Reducir payload
+            return $ev;
+        });
+
+        return $eventos;
+    }
+
     public function store(Request $request) {
         $messages = [
             'id_tipo_evento.required' => 'Debes seleccionar un tipo de evento',
@@ -259,4 +308,40 @@ class EventoController extends Controller
         return response()->json(null, 204);
     }
 
+    /**
+     * Notificar a los Jefes de Sección que deben armar sus listas
+     */
+    public function solicitarListas($id)
+    {
+        $evento = Evento::with(['requerimientos.instrumento', 'tipo'])->findOrFail($id);
+
+        $instrumentosIds = $evento->requerimientos->pluck('id_instrumento')->unique();
+
+        $jefes = \App\Models\Miembro::whereIn('id_instrumento', $instrumentosIds)
+            ->whereHas('rol', function($q) {
+                $q->where('rol', 'JEFE DE SECCIÓN');
+            })
+            ->with(['user', 'instrumento'])
+            ->get();
+
+        $enviados = 0;
+        foreach ($jefes as $jefe) {
+            if ($jefe->user) {
+                \App\Models\Notificacion::enviar(
+                    $jefe->user->id_user,
+                    "📋 Solicitud de Lista - {$evento->tipo->evento}",
+                    "El Director solicita armar la lista de {$jefe->instrumento->instrumento} para el evento: {$evento->evento}.",
+                    $evento->id_evento,
+                    'convocatoria',
+                    "/dashboard/eventos/{$evento->id_evento}/convocatoria"
+                );
+                $enviados++;
+            }
+        }
+
+        return response()->json([
+            'message' => "Solicitud enviada a {$enviados} Jefes de Sección.",
+            'jefes_notificados' => $enviados
+        ]);
+    }
 }

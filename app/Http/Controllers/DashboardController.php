@@ -152,7 +152,22 @@ class DashboardController extends Controller
                 'miembros_seccion' => $miembrosSeccion,
                 'eventos' => [
                     'hoy' => $eventosHoy,
-                    'proximos' => $proximosEventos
+                    'proximos' => $proximosEventos,
+                    'pendientes_formacion' => $isMusico ? 0 : Evento::where('fecha', '>=', Carbon::today()->toDateString())
+                        ->where('estado', true)
+                        ->whereHas('requerimientos')
+                        ->get()
+                        ->filter(function($ev) use ($isJefe, $user) {
+                            if ($isJefe) {
+                                $idInst = $user->miembro->id_instrumento;
+                                $req = $ev->requerimientos->where('id_instrumento', $idInst)->first();
+                                if (!$req) return false;
+                                return $ev->convocatorias()->whereHas('miembro', function($q) use ($idInst) {
+                                    $q->where('id_instrumento', $idInst);
+                                })->count() < $req->cantidad_necesaria;
+                            }
+                            return $ev->convocatorias->count() < $ev->requerimientos->sum('cantidad_necesaria');
+                        })->count()
                 ],
                 'asistencia' => [
                     'promedio' => $asistenciaPromedio,

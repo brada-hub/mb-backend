@@ -147,12 +147,12 @@ class AsistenciaStatsController extends Controller
         });
 
         foreach ($pastEvents as $record) {
-            if (in_array($record->estado, ['PUNTUAL', 'RETRASO'])) {
+            if (in_array($record->estado, ['PUNTUAL', 'RETRASO', 'PRESENTE'])) {
                 $streak++;
             } else if ($record->estado == 'FALTA' || is_null($record->estado)) {
                 break;
             }
-            if ($record->estado !== 'PUNTUAL' && $record->estado !== 'RETRASO' && $record->estado !== 'JUSTIFICADO') {
+            if (!in_array($record->estado, ['PUNTUAL', 'RETRASO', 'PRESENTE', 'JUSTIFICADO'])) {
                 break;
             }
         }
@@ -187,6 +187,105 @@ class AsistenciaStatsController extends Controller
         return response()->json($data);
     }
 
+    public function reportMatrix(Request $request)
+    {
+        $startDate = $request->input('start_date', Carbon::now()->startOfMonth()->toDateString());
+        $endDate = $request->input('end_date', Carbon::now()->toDateString());
+        $idTipoEvento = $request->input('id_tipo_evento'); // Can be string "1,2,3" or array
+
+        $user = auth()->user();
+        $miMiembro = $user?->miembro;
+        $role = strtoupper($miMiembro?->rol?->rol ?? '');
+        $isJefe = str_contains($role, 'JEFE') || str_contains($role, 'DELEGADO');
+        $isAdminOrDirector = in_array($role, ['ADMIN', 'DIRECTOR', 'ADMINISTRADOR']);
+
+        // 1. Get Events in range
+        $eventQuery = Evento::whereBetween('fecha', [$startDate, $endDate])
+            ->where('id_banda', $user->id_banda ?? 0)
+            ->with('tipo');
+
+        if ($idTipoEvento) {
+            $types = is_array($idTipoEvento) ? $idTipoEvento : explode(',', $idTipoEvento);
+            $eventQuery->whereIn('id_tipo_evento', $types);
+        }
+
+        $eventos = $eventQuery->orderBy('fecha')->orderBy('hora')->get();
+        $eventIds = $eventos->pluck('id_evento');
+
+        // 2. Get Members
+        $memberQuery = Miembro::with(['instrumento', 'seccion'])
+            ->where('id_banda', $user->id_banda ?? 0);
+
+        if ($isJefe && !$isAdminOrDirector && $miMiembro && $miMiembro->id_instrumento) {
+            $memberQuery->where('id_instrumento', $miMiembro->id_instrumento);
+        }
+
+        $miembros = $memberQuery->get();
+        $memberIds = $miembros->pluck('id_miembro');
+
+        // 3. Get Assistances
+        $assistances = DB::table('asistencias')
+            ->join('convocatoria_evento', 'asistencias.id_convocatoria', '=', 'convocatoria_evento.id_convocatoria')
+            ->whereIn('convocatoria_evento.id_evento', $eventIds)
+            ->whereIn('convocatoria_evento.id_miembro', $memberIds)
+            ->select('convocatoria_evento.id_miembro', 'convocatoria_evento.id_evento', 'asistencias.estado', 'asistencias.minutos_retraso')
+            ->get();
+
+        // 4. Map Assistances to a grid
+        $grid = [];
+        foreach ($assistances as $asist) {
+            $grid[$asist->id_miembro][$asist->id_evento] = [
+                'estado' => $asist->estado,
+                'retraso' => $asist->minutos_retraso
+            ];
+        }
+
+        // Group members by instrument if Director/Admin
+        $groupedReport = [];
+        if ($isAdminOrDirector) {
+            $groupedMiembros = $miembros->sortBy('instrumento.instrumento')->groupBy('instrumento.instrumento');
+            foreach ($groupedMiembros as $instrument => $mems) {
+                $groupedReport[] = [
+                    'instrumento' => $instrument ?: 'Sin Instrumento',
+                    'miembros' => $mems->map(function($m) use ($grid) {
+                        return [
+                            'id_miembro' => $m->id_miembro,
+                            'nombre_completo' => "{$m->nombres} {$m->apellidos}",
+                            'nombres' => $m->nombres,
+                            'apellidos' => $m->apellidos,
+                            'asistencias' => $grid[$m->id_miembro] ?? []
+                        ];
+                    })
+                ];
+            }
+        } else {
+            // Section Leader view (just one group or simple list)
+            $groupedReport[] = [
+                'instrumento' => $miembros->first()?->instrumento?->instrumento ?? 'Mi Sección',
+                'miembros' => $miembros->map(function($m) use ($grid) {
+                    return [
+                        'id_miembro' => $m->id_miembro,
+                        'nombre_completo' => "{$m->nombres} {$m->apellidos}",
+                        'nombres' => $m->nombres,
+                        'apellidos' => $m->apellidos,
+                        'asistencias' => $grid[$m->id_miembro] ?? []
+                    ];
+                })
+            ];
+        }
+
+        return response()->json([
+            'eventos' => $eventos->map(fn($e) => [
+                'id_evento' => $e->id_evento,
+                'evento' => $e->evento,
+                'fecha' => $e->fecha,
+                'dia' => Carbon::parse($e->fecha)->format('d'),
+                'tipo' => $e->tipo?->evento ?? 'N/A'
+            ]),
+            'data' => $groupedReport
+        ]);
+    }
+
     public function downloadGroupReportPdf(Request $request)
     {
         $data = $this->getReportData($request);
@@ -202,9 +301,21 @@ class AsistenciaStatsController extends Controller
         $startDate = $request->input('start_date', Carbon::now()->startOfYear()->toDateString());
         $endDate = $request->input('end_date', Carbon::now()->toDateString());
         $idSeccion = $request->input('id_seccion');
-        $idTipoEvento = $request->input('id_tipo_evento');
+        $idTipoEvento = $request->input('id_tipo_evento'); // Can be string "1,2,3" or array
 
-        $query = Miembro::with(['instrumento', 'seccion']);
+        $user = auth()->user();
+        $miMiembro = $user?->miembro;
+        $role = strtoupper($miMiembro?->rol?->rol ?? '');
+        $isJefe = str_contains($role, 'JEFE') || str_contains($role, 'DELEGADO');
+        $isAdminOrDirector = in_array($role, ['ADMIN', 'DIRECTOR', 'ADMINISTRADOR']);
+
+        $query = Miembro::with(['instrumento', 'seccion'])
+            ->where('id_banda', $user->id_banda ?? 0);
+
+        // AUTO-FILTER for Jefe de Sección
+        if ($isJefe && !$isAdminOrDirector && $miMiembro && $miMiembro->id_instrumento) {
+            $query->where('id_instrumento', $miMiembro->id_instrumento);
+        }
 
         if ($idSeccion) {
             $query->where('id_seccion', $idSeccion);
@@ -218,7 +329,8 @@ class AsistenciaStatsController extends Controller
             ->whereBetween('eventos.fecha', [$startDate, $endDate]);
 
         if ($idTipoEvento) {
-            $statsQuery->where('eventos.id_tipo_evento', $idTipoEvento);
+            $types = is_array($idTipoEvento) ? $idTipoEvento : explode(',', $idTipoEvento);
+            $statsQuery->whereIn('eventos.id_tipo_evento', $types);
         }
 
         $stats = $statsQuery->select(
@@ -294,8 +406,19 @@ class AsistenciaStatsController extends Controller
 
     public function getRankings(Request $request)
     {
-        // Get all member IDs
-        $miembros = Miembro::with('instrumento')->get();
+        $user = auth()->user();
+        $miMiembro = $user?->miembro;
+        $role = strtoupper($miMiembro?->rol?->rol ?? '');
+        $isJefe = str_contains($role, 'JEFE') || str_contains($role, 'DELEGADO');
+
+        // Get members
+        $query = Miembro::with('instrumento');
+
+        if ($isJefe && $miMiembro && $miMiembro->id_instrumento) {
+            $query->where('id_instrumento', $miMiembro->id_instrumento);
+        }
+
+        $miembros = $query->get();
         if ($miembros->isEmpty()) return response()->json(['rankings' => []]);
 
         // Pre-fetch all past assistances for these members

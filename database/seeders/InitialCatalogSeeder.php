@@ -17,6 +17,8 @@ class InitialCatalogSeeder extends Seeder
 {
     public function run(): void
     {
+        $proPlan = \App\Models\Plan::where('nombre', 'PRO')->first();
+
         // 0. Crear Banda Principal (Monster Band)
         $banda = \App\Models\Banda::create([
             'nombre' => 'Monster Band',
@@ -26,6 +28,7 @@ class InitialCatalogSeeder extends Seeder
             'color_secundario' => '#161b2c',
             'estado' => true,
             'plan' => 'PRO',
+            'id_plan' => $proPlan?->id_plan,
             'max_miembros' => 100
         ]);
 

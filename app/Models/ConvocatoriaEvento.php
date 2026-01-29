@@ -10,7 +10,7 @@ class ConvocatoriaEvento extends Model
     use HasFactory;
     protected $table = 'convocatoria_evento';
     protected $primaryKey = 'id_convocatoria';
-    protected $fillable = ['id_evento', 'id_miembro', 'confirmado_por_director'];
+    protected $fillable = ['id_evento', 'id_miembro', 'confirmado_por_director', 'pagado', 'fecha_pago'];
 
     public function evento()
     {

@@ -80,6 +80,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/asistencias/stats', [\App\Http\Controllers\AsistenciaStatsController::class, 'globalStats']);
     Route::get('/asistencias/member/{id}', [\App\Http\Controllers\AsistenciaStatsController::class, 'memberStats']);
     Route::get('/asistencias/reporte-grupal', [\App\Http\Controllers\AsistenciaStatsController::class, 'groupReport']);
+    Route::get('/asistencias/reporte-matrix', [\App\Http\Controllers\AsistenciaStatsController::class, 'reportMatrix']);
     Route::get('/asistencias/reporte-grupal/pdf', [\App\Http\Controllers\AsistenciaStatsController::class, 'downloadGroupReportPdf']);
     Route::get('/asistencias/rankings', [\App\Http\Controllers\AsistenciaStatsController::class, 'getRankings']);
 
@@ -91,17 +92,24 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/convocatorias/confirmar-masivo', [\App\Http\Controllers\ConvocatoriaController::class, 'confirmarMasivo']);
     Route::post('/convocatorias/responder', [\App\Http\Controllers\ConvocatoriaController::class, 'confirmarMiembro']);
     Route::post('/convocatorias/reemplazar', [\App\Http\Controllers\ConvocatoriaController::class, 'reemplazar']);
+    Route::post('/convocatorias/vincular-formacion', [\App\Http\Controllers\ConvocatoriaController::class, 'vincularFormacion']);
     Route::delete('/convocatorias/{id}', [\App\Http\Controllers\ConvocatoriaController::class, 'destroy']);
+
+    // Formaciones (Plantillas de Personal)
+    Route::apiResource('formaciones', \App\Http\Controllers\FormacionController::class);
+    Route::post('/formaciones/{id}/toggle-activo', [\App\Http\Controllers\FormacionController::class, 'toggleActivo']);
 
     // Eventos
     Route::get('/eventos/tipos', [EventoController::class, 'getTipos']);
     Route::post('/eventos/tipos', [EventoController::class, 'storeTipo']);
     Route::get('/eventos/proximos', [EventoController::class, 'proximos']);
+    Route::get('/eventos/proximas-convocatorias', [EventoController::class, 'proximasConvocatorias']);
     // Route::get('/eventos/tipos'... Moved to public
     // These might be redundant if using ConvocatoriaController but keeping for now
     Route::get('/eventos/{id}/convocatoria', [EventoController::class, 'convocatoria']);
     Route::patch('/eventos/{id}/confirmar', [EventoController::class, 'confirmar']);
     Route::apiResource('eventos', EventoController::class);
+    Route::post('/eventos/{id}/solicitar-listas', [EventoController::class, 'solicitarListas']);
 
     // Recursos
     Route::get('/recursos', [RecursoController::class, 'index']);

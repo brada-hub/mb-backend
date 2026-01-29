@@ -5,10 +5,43 @@ namespace App\Http\Controllers;
 use App\Models\ConvocatoriaEvento;
 use App\Models\Miembro;
 use App\Models\Evento;
+use App\Models\Formacion;
 use Illuminate\Http\Request;
 
 class ConvocatoriaController extends Controller
 {
+    /**
+     * Vincular una formación completa a un evento
+     */
+    public function vincularFormacion(Request $request)
+    {
+        $validated = $request->validate([
+            'id_evento' => 'required|exists:eventos,id_evento',
+            'id_formacion' => 'required|exists:formaciones,id_formacion'
+        ]);
+
+        $formacion = Formacion::with('miembros')->findOrFail($request->id_formacion);
+
+        $nuevasConvocatorias = [];
+        foreach ($formacion->miembros as $miembro) {
+            $nuevasConvocatorias[] = ConvocatoriaEvento::updateOrCreate(
+                [
+                    'id_evento' => $request->id_evento,
+                    'id_miembro' => $miembro->id_miembro
+                ],
+                [
+                    // Por defecto las formaciones predefinidas suelen ser de confianza,
+                    // pero mantenemos confirmado_por_director en false para revisión final si se prefiere.
+                    'confirmado_por_director' => false
+                ]
+            );
+        }
+
+        return response()->json([
+            'message' => 'Formación vinculada correctamente',
+            'count' => count($nuevasConvocatorias)
+        ]);
+    }
     /**
      * Get convocatorias for a specific event
      */

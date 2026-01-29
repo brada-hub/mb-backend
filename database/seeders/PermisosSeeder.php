@@ -40,7 +40,7 @@ class PermisosSeeder extends Seeder
         }
 
         // Link to DELEGADO / JEFE (Attendance + Events + Dashboard)
-        $delegado = Rol::where('rol', 'DELEGADO / JEFE')->first();
+        $delegado = Rol::where('rol', 'JEFE DE SECCIÓN')->first();
         if ($delegado) {
             $delegado->permisos()->sync(Permiso::whereIn('permiso', [
                 'VER_DASHBOARD',
