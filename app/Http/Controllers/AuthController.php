@@ -61,8 +61,9 @@ class AuthController extends Controller
             }
         }
 
-        // 4. Device Bonding (Only for Mobile)
-        if ($request->platform === 'mobile' && $request->uuid_celular) {
+        // 4. Device Bonding (Only for Mobile - includes android, ios, mobile)
+        $isMobilePlatform = in_array($request->platform, ['mobile', 'android', 'ios']);
+        if ($isMobilePlatform && $request->uuid_celular) {
             // Check if THIS specific device is already registered
             $currentDevice = DispositivoAutorizado::where('id_user', $user->id_user)
                                                   ->where('uuid_celular', $request->uuid_celular)
