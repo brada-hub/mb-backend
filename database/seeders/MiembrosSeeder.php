@@ -18,7 +18,7 @@ class MiembrosSeeder extends Seeder
         $faker = Faker::create('es_BO');
 
         // Obtener Banda Principal
-        $banda = \App\Models\Banda::where('slug', 'monster-band')->first();
+        $banda = \App\Models\Banda::where('slug', 'monster')->first();
         $idBanda = $banda ? $banda->id_banda : null;
 
         $instrumentos = Instrumento::all();
@@ -81,7 +81,9 @@ class MiembrosSeeder extends Seeder
                     'id_voz' => $vozId,
                     'id_rol' => $rolMiembro,
                     'id_categoria' => $categoriaAup,
-                    'id_banda' => $idBanda
+                    'id_banda' => $idBanda,
+                    'created_at' => '2026-01-01 00:00:00',
+                    'updated_at' => '2026-01-01 00:00:00'
                 ]);
 
                 // Crear Usuario asociado (LOGIN: CI / PASS: CI)
@@ -93,8 +95,10 @@ class MiembrosSeeder extends Seeder
                     'password' => Hash::make($ci), // Password is CI
                     'id_miembro' => $miembro->id_miembro,
                     'estado' => true,
-                    'password_changed' => false, // Force change on first login if logic exists (User said: "luego obligamos a cambiar")
-                    'id_banda' => $idBanda
+                    'password_changed' => false,
+                    'id_banda' => $idBanda,
+                    'created_at' => '2026-01-01 00:00:00',
+                    'updated_at' => '2026-01-01 00:00:00'
                 ]);
             }
         }

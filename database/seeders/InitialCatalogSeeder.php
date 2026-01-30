@@ -21,11 +21,11 @@ class InitialCatalogSeeder extends Seeder
 
         // 0. Crear Banda Principal (Monster Band)
         $banda = \App\Models\Banda::create([
-            'nombre' => 'Monster Band',
-            'slug' => 'monster-band',
+            'nombre' => 'MONSTER BAND',
+            'slug' => 'monster',
             'logo' => null,
-            'color_primario' => '#6366f1',
-            'color_secundario' => '#161b2c',
+            'color_primario' => '#00f2fe',
+            'color_secundario' => '#0d0f17',
             'estado' => true,
             'plan' => 'PRO',
             'id_plan' => $proPlan?->id_plan,
@@ -59,7 +59,7 @@ class InitialCatalogSeeder extends Seeder
         // Estructura: 'NOMBRE_SECCION' => ['Instr1', 'Instr2', ...]
         $catalog = [
             'PERCUSIÓN' => ['PLATILLO', 'TAMBOR', 'TIMBAL', 'BOMBO'],
-            'VIENTOS' => ['TROMPETA', 'TROMBÓN', 'BARÍTONO', 'HELICÓN', 'CLARINETE']
+            'VIENTOS' => ['TROMBON', 'CLARINETE', 'BARITONO', 'TROMPETA', 'HELICON']
         ];
 
         // Guardamos referencias para asignar al admin después

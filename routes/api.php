@@ -21,6 +21,7 @@ Route::get('/test-roles', function() { return response()->json(['status' => 'ok'
 // Public Auth routes only (login, check-device)
 Route::post('/login', [AuthController::class, 'login']);
 Route::post('/check-device', [AuthController::class, 'checkDevice']);
+Route::get('/branding/{slug}', [\App\Http\Controllers\BandaController::class, 'getBranding']);
 Route::post('/cleanup-test-member', [MiembroController::class, 'cleanupTestMember']);
 Route::post('/cleanup-test-data', [SeccionController::class, 'cleanupTestData']);
 

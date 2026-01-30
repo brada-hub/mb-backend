@@ -18,10 +18,10 @@ class EventosSeeder extends Seeder
     {
         $faker = Faker::create('es_BO');
 
-        // 1. Obtener la banda "monster-band"
-        $banda = Banda::where('slug', 'monster-band')->first();
+        // 1. Obtener la banda "monster"
+        $banda = Banda::where('slug', 'monster')->first();
         if (!$banda) {
-            $this->command->error('No se encontró la banda "monster-band". Corre InitialCatalogSeeder primero.');
+            $this->command->error('No se encontró la banda "monster". Corre InitialCatalogSeeder primero.');
             return;
         }
         $idBanda = $banda->id_banda;

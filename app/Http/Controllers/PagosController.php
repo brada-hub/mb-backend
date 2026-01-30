@@ -7,6 +7,8 @@ use App\Models\ConvocatoriaEvento;
 use App\Models\Miembro;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Storage;
+use App\Models\Banda;
 
 class PagosController extends Controller
 {
@@ -144,7 +146,26 @@ class PagosController extends Controller
             return $d['total_eventos'] > 0;
         });
 
-        $pdf = \Barryvdh\DomPDF\Facade\Pdf::loadView('pdf.reporte_deudas', ['deudores' => $deudores]);
+        $user = auth()->user();
+        $banda = Banda::find($user->id_banda);
+        $logoBase64 = null;
+
+        if ($banda && $banda->logo) {
+            $path = str_replace('/storage/', '', $banda->logo);
+            if (Storage::disk('public')->exists($path)) {
+                $file = Storage::disk('public')->get($path);
+                $type = Storage::disk('public')->mimeType($path);
+                $logoBase64 = 'data:' . $type . ';base64,' . base64_encode($file);
+            }
+        }
+
+        $pdf = \Barryvdh\DomPDF\Facade\Pdf::loadView('pdf.reporte_deudas', [
+            'deudores' => $deudores,
+            'banda' => [
+                'nombre' => $banda?->nombre ?? 'Monster Band',
+                'logo' => $logoBase64
+            ]
+        ]);
 
         return $pdf->download('planilla_deudas_' . date('Y-m-d') . '.pdf');
     }

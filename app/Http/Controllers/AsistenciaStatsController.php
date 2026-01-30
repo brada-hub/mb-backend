@@ -8,7 +8,9 @@ use App\Models\ConvocatoriaEvento;
 use App\Models\Evento;
 use App\Models\Miembro;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Storage;
 use Carbon\Carbon;
+use App\Models\Banda;
 
 class AsistenciaStatsController extends Controller
 {
@@ -125,6 +127,7 @@ class AsistenciaStatsController extends Controller
             ->join('eventos', 'convocatoria_evento.id_evento', '=', 'eventos.id_evento')
             ->leftJoin('asistencias', 'convocatoria_evento.id_convocatoria', '=', 'asistencias.id_convocatoria')
             ->where('convocatoria_evento.id_miembro', $id)
+            ->whereDate('eventos.fecha', '>=', $miembro->created_at->toDateString())
             ->select(
                 'eventos.id_evento',
                 'eventos.evento',
@@ -191,7 +194,9 @@ class AsistenciaStatsController extends Controller
     {
         $startDate = $request->input('start_date', Carbon::now()->startOfMonth()->toDateString());
         $endDate = $request->input('end_date', Carbon::now()->toDateString());
-        $idTipoEvento = $request->input('id_tipo_evento'); // Can be string "1,2,3" or array
+        $idTipoEvento = $request->input('id_tipo_evento');
+        $idSeccion = $request->input('id_seccion');
+        $idInstrumento = $request->input('id_instrumento');
 
         $user = auth()->user();
         $miMiembro = $user?->miembro;
@@ -220,6 +225,14 @@ class AsistenciaStatsController extends Controller
             $memberQuery->where('id_instrumento', $miMiembro->id_instrumento);
         }
 
+        if ($idSeccion) {
+            $memberQuery->where('id_seccion', $idSeccion);
+        }
+
+        if ($idInstrumento) {
+            $memberQuery->where('id_instrumento', $idInstrumento);
+        }
+
         $miembros = $memberQuery->get();
         $memberIds = $miembros->pluck('id_miembro');
 
@@ -243,8 +256,20 @@ class AsistenciaStatsController extends Controller
         // Group members by instrument if Director/Admin
         $groupedReport = [];
         if ($isAdminOrDirector) {
-            $groupedMiembros = $miembros->sortBy('instrumento.instrumento')->groupBy('instrumento.instrumento');
-            foreach ($groupedMiembros as $instrument => $mems) {
+            $orderMap = [
+                'PLATILLO' => 1, 'TAMBOR' => 2, 'TIMBAL' => 3, 'BOMBO' => 4,
+                'TROMBON' => 5, 'CLARINETE' => 6, 'BARITONO' => 7, 'TROMPETA' => 8, 'HELICON' => 9
+            ];
+
+            $groupedMiembros = $miembros->groupBy('instrumento.instrumento');
+
+            // Sort keys based on the map
+            $sortedKeys = $groupedMiembros->keys()->sortBy(function($key) use ($orderMap) {
+                return $orderMap[strtoupper($key)] ?? 99;
+            });
+
+            foreach ($sortedKeys as $instrument) {
+                $mems = $groupedMiembros[$instrument];
                 $groupedReport[] = [
                     'instrumento' => $instrument ?: 'Sin Instrumento',
                     'miembros' => $mems->map(function($m) use ($grid) {
@@ -301,13 +326,26 @@ class AsistenciaStatsController extends Controller
         $startDate = $request->input('start_date', Carbon::now()->startOfYear()->toDateString());
         $endDate = $request->input('end_date', Carbon::now()->toDateString());
         $idSeccion = $request->input('id_seccion');
-        $idTipoEvento = $request->input('id_tipo_evento'); // Can be string "1,2,3" or array
+        $idInstrumento = $request->input('id_instrumento');
+        $idTipoEvento = $request->input('id_tipo_evento');
 
         $user = auth()->user();
         $miMiembro = $user?->miembro;
         $role = strtoupper($miMiembro?->rol?->rol ?? '');
         $isJefe = str_contains($role, 'JEFE') || str_contains($role, 'DELEGADO');
         $isAdminOrDirector = in_array($role, ['ADMIN', 'DIRECTOR', 'ADMINISTRADOR']);
+
+        $banda = Banda::find($user->id_banda);
+        $logoBase64 = null;
+
+        if ($banda && $banda->logo) {
+            $path = str_replace('/storage/', '', $banda->logo);
+            if (Storage::disk('public')->exists($path)) {
+                $file = Storage::disk('public')->get($path);
+                $type = Storage::disk('public')->mimeType($path);
+                $logoBase64 = 'data:' . $type . ';base64,' . base64_encode($file);
+            }
+        }
 
         $query = Miembro::with(['instrumento', 'seccion'])
             ->where('id_banda', $user->id_banda ?? 0);
@@ -321,12 +359,18 @@ class AsistenciaStatsController extends Controller
             $query->where('id_seccion', $idSeccion);
         }
 
+        if ($idInstrumento) {
+            $query->where('id_instrumento', $idInstrumento);
+        }
+
         $miembros = $query->get();
 
         $statsQuery = DB::table('convocatoria_evento')
             ->join('eventos', 'convocatoria_evento.id_evento', '=', 'eventos.id_evento')
+            ->join('miembros', 'convocatoria_evento.id_miembro', '=', 'miembros.id_miembro')
             ->leftJoin('asistencias', 'convocatoria_evento.id_convocatoria', '=', 'asistencias.id_convocatoria')
-            ->whereBetween('eventos.fecha', [$startDate, $endDate]);
+            ->whereBetween('eventos.fecha', [$startDate, $endDate])
+            ->whereRaw('eventos.fecha >= CAST(miembros.created_at AS DATE)');
 
         if ($idTipoEvento) {
             $types = is_array($idTipoEvento) ? $idTipoEvento : explode(',', $idTipoEvento);
@@ -400,6 +444,10 @@ class AsistenciaStatsController extends Controller
                 'end_date' => $endDate,
                 'id_seccion' => $idSeccion,
                 'id_tipo_evento' => $idTipoEvento
+            ],
+            'banda' => [
+                'nombre' => $banda?->nombre ?? 'Monster Band',
+                'logo' => $logoBase64
             ]
         ];
     }
@@ -424,9 +472,11 @@ class AsistenciaStatsController extends Controller
         // Pre-fetch all past assistances for these members
         $allAsistencias = DB::table('convocatoria_evento')
             ->join('eventos', 'convocatoria_evento.id_evento', '=', 'eventos.id_evento')
+            ->join('miembros', 'convocatoria_evento.id_miembro', '=', 'miembros.id_miembro')
             ->leftJoin('asistencias', 'convocatoria_evento.id_convocatoria', '=', 'asistencias.id_convocatoria')
             ->where('eventos.fecha', '<', Carbon::today()->toDateString())
             ->where('eventos.id_banda', auth()->user()->id_banda ?? 0)
+            ->whereRaw('eventos.fecha >= CAST(miembros.created_at AS DATE)')
             ->select('convocatoria_evento.id_miembro', 'asistencias.estado', 'eventos.fecha')
             ->orderBy('eventos.fecha', 'desc')
             ->get()

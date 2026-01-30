@@ -22,6 +22,13 @@ class AuthController extends Controller
 
         if (!$user->estado) return response()->json(['message' => 'Usuario inactivo'], 403);
 
+        // Validation: If login via band portal, ensure user belongs to that band
+        if ($request->band_slug && !$user->isSuperAdmin()) {
+            if (!$user->banda || $user->banda->slug !== $request->band_slug) {
+                return response()->json(['message' => 'Acceso denegado: Este usuario no pertenece a esta organización.'], 403);
+            }
+        }
+
         // 2. Super Admin bypass - no necesita miembro
         if ($user->isSuperAdmin()) {
             $token = $user->createToken($request->platform . '-token')->plainTextToken;

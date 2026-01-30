@@ -12,7 +12,7 @@ class RealDemoDataSeeder extends Seeder
     {
         $this->command->info("Iniciando con DB puro...");
 
-        $bandaId = DB::table('bandas')->where('slug', 'monster-band')->value('id_banda');
+        $bandaId = DB::table('bandas')->where('slug', 'monster')->value('id_banda');
         if (!$bandaId) {
             $this->command->error("Banda no encontrada");
             return;
@@ -48,8 +48,8 @@ class RealDemoDataSeeder extends Seeder
                     'id_categoria' => 1,
                     'id_banda' => $bandaId,
                     'fecha' => '2000-01-01',
-                    'created_at' => now(),
-                    'updated_at' => now()
+                    'created_at' => '2026-01-01 00:00:00',
+                    'updated_at' => '2026-01-01 00:00:00'
                 ]);
                 $count++;
             }
