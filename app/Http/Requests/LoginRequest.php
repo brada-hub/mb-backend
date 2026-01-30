@@ -17,7 +17,7 @@ class LoginRequest extends FormRequest
             'user' => 'required|string',
             'password' => 'required|string',
             'uuid_celular' => 'nullable|string',
-            'platform' => 'required|in:web,mobile' // To distinguish Director vs Musician entry point
+            'platform' => 'required|in:web,mobile,android,ios' // To distinguish Director vs Musician entry point
         ];
     }
 }
