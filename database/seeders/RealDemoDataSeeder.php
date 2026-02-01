@@ -18,10 +18,10 @@ class RealDemoDataSeeder extends Seeder
             return;
         }
 
-        // CLEANUP January 2026
+        // CLEANUP January - February 2026
         $eventIds = DB::table('eventos')
             ->where('id_banda', $bandaId)
-            ->whereBetween('fecha', ['2026-01-01', '2026-01-31'])
+            ->whereBetween('fecha', ['2026-01-01', '2026-02-28'])
             ->pluck('id_evento');
 
         if ($eventIds->isNotEmpty()) {
@@ -63,8 +63,9 @@ class RealDemoDataSeeder extends Seeder
             'BANDIN' => DB::table('tipos_evento')->where('evento', 'BANDIN')->value('id_tipo_evento'),
         ];
 
-        // Dates requested: 4 Ensayos (Tue/Thu), 2 Contracts (Sat/Sun), 1 Bandin (Sat)
+        // Dates requested: January (Past) + February (Current/Future)
         $dates = [
+            // Enero (Historial)
             '2026-01-13' => ['type' => $types['ENSAYO'], 'name' => 'ENSAYO MARTES', 'rem' => 0],
             '2026-01-15' => ['type' => $types['ENSAYO'], 'name' => 'ENSAYO JUEVES', 'rem' => 0],
             '2026-01-20' => ['type' => $types['ENSAYO'], 'name' => 'ENSAYO MARTES 2', 'rem' => 0],
@@ -72,6 +73,12 @@ class RealDemoDataSeeder extends Seeder
             '2026-01-24' => ['type' => $types['CONTRATO'], 'name' => 'CONTRATO SABADO', 'rem' => 1],
             '2026-01-25' => ['type' => $types['CONTRATO'], 'name' => 'CONTRATO DOMINGO', 'rem' => 1],
             '2026-01-17' => ['type' => $types['BANDIN'], 'name' => 'BANDIN ESPECIAL', 'rem' => 1],
+
+            // Febrero (Actual/Futuro)
+            '2026-02-03' => ['type' => $types['ENSAYO'], 'name' => 'ENSAYO FEB 1', 'rem' => 0],
+            '2026-02-05' => ['type' => $types['ENSAYO'], 'name' => 'ENSAYO FEB 2', 'rem' => 0],
+            '2026-02-07' => ['type' => $types['CONTRATO'], 'name' => 'CONTRATO CARNAVAL', 'rem' => 1],
+            '2026-02-10' => ['type' => $types['ENSAYO'], 'name' => 'ENSAYO FEB 3', 'rem' => 0],
         ];
 
         foreach ($dates as $date => $info) {

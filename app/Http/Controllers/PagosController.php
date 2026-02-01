@@ -115,8 +115,8 @@ class PagosController extends Controller
             if ($miembro && $miembro->user) {
                 $cantidad = $items->count();
                 $mensaje = $cantidad === 1
-                    ? "Se ha registrado el pago de 1 evento: {$items->first()->evento->evento} 💰"
-                    : "Se han registrado pagos para {$cantidad} eventos. Revisa tu historial de cobros 💰";
+                    ? "Se ha registrado el pago de 1 evento: {$items->first()->evento->evento}"
+                    : "Se han registrado pagos para {$cantidad} eventos. Revisa tu historial de cobros";
 
                 \App\Models\Notificacion::enviar(
                     $miembro->user->id_user,

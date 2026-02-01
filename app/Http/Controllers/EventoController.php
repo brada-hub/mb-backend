@@ -204,7 +204,7 @@ class EventoController extends Controller
                     if ($miembro->user) {
                         \App\Models\Notificacion::enviar(
                             $miembro->user->id_user,
-                            "Nuevo Ensayo Agendado 🎭",
+                            "Nuevo Ensayo Agendado",
                             "Se ha programado: {$evento->evento} para el " . \Carbon\Carbon::parse($evento->fecha)->format('d/m') . " a las " . \Carbon\Carbon::parse($evento->hora)->format('H:i'),
                             $conv->id_convocatoria,
                             'convocatoria',
@@ -329,7 +329,7 @@ class EventoController extends Controller
             if ($jefe->user) {
                 \App\Models\Notificacion::enviar(
                     $jefe->user->id_user,
-                    "📋 Solicitud de Lista - {$evento->tipo->evento}",
+                    "Solicitud de Lista - {$evento->tipo->evento}",
                     "El Director solicita armar la lista de {$jefe->instrumento->instrumento} para el evento: {$evento->evento}.",
                     $evento->id_evento,
                     'convocatoria',

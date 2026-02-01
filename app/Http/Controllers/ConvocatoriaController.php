@@ -146,7 +146,7 @@ class ConvocatoriaController extends Controller
         if ($convocatoria->miembro && $convocatoria->miembro->user) {
             \App\Models\Notificacion::enviar(
                 $convocatoria->miembro->user->id_user,
-                "¡Nueva Convocatoria! 🎷",
+                "¡Nueva Convocatoria!",
                 "Fuiste seleccionado para el evento: {$convocatoria->evento->evento}. Revisa tu agenda.",
                 $convocatoria->id_evento,
                 'convocatoria',
@@ -200,7 +200,7 @@ class ConvocatoriaController extends Controller
 
             \App\Models\Notificacion::enviar(
                 $userId,
-                "¡Nuevas Convocatorias! 🎷",
+                "¡Nuevas Convocatorias!",
                 $mensaje,
                 null, // id_referencia nulo para agrupación
                 'convocatoria',
@@ -290,7 +290,7 @@ class ConvocatoriaController extends Controller
         if ($convocatoria->miembro && $convocatoria->miembro->user) {
             \App\Models\Notificacion::enviar(
                 $convocatoria->miembro->user->id_user,
-                "Participación Cancelada ❌",
+                "Participación Cancelada",
                 "Tu participación en el evento '{$convocatoria->evento->evento}' ha sido cancelada.",
                 $convocatoria->id_evento,
                 'cancelacion',

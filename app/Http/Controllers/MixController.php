@@ -15,16 +15,22 @@ class MixController extends Controller
     public function index(Request $request)
     {
         $user = $request->user();
-        $query = Mix::with('audio')->withCount('temas');
 
-        // Determinar si es admin/director/jefe buscando el rol en la relación miembro
-        $isAdmin = false;
-        if ($user && $user->miembro && $user->miembro->rol) {
-            $roleName = $user->miembro->rol->rol;
-            $isAdmin = $roleName === 'ADMIN' || $roleName === 'DIRECTOR' || (is_string($roleName) && str_contains($roleName, 'JEFE'));
+        // SuperAdmin puede ver todo
+        if ($user && $user->is_super_admin) {
+            return Mix::with('audio')->withCount('temas')->get();
         }
 
-        // Si no es admin/director/jefe, y existe la columna 'activo', solo ver los activos
+        $query = Mix::with('audio')->withCount('temas');
+
+        // Determinar si es admin/director/jefe
+        $isAdmin = false;
+        if ($user?->miembro?->rol) {
+            $roleName = $user->miembro->rol->rol ?? '';
+            $isAdmin = in_array($roleName, ['ADMIN', 'DIRECTOR']) || str_contains($roleName, 'JEFE');
+        }
+
+        // Si no es admin, solo ver los activos
         if (!$isAdmin && \Illuminate\Support\Facades\Schema::hasColumn('mixes', 'activo')) {
             $query->where('activo', true);
         }

@@ -19,12 +19,12 @@ class Formacion extends Model
         'activo' => 'boolean'
     ];
 
-    public function detalles()
+    public function detalles(): \Illuminate\Database\Eloquent\Relations\HasMany
     {
         return $this->hasMany(DetalleFormacion::class, 'id_formacion');
     }
 
-    public function miembros()
+    public function miembros(): \Illuminate\Database\Eloquent\Relations\BelongsToMany
     {
         return $this->belongsToMany(Miembro::class, 'detalle_formaciones', 'id_formacion', 'id_miembro');
     }

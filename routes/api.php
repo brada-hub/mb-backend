@@ -132,6 +132,9 @@ Route::middleware('auth:sanctum')->group(function () {
 
     // ========== SUPER ADMIN ROUTES ==========
     Route::prefix('superadmin')->group(function () {
+        // SUPER ENDPOINT: Todo el dashboard en una sola petición
+        Route::get('/dashboard', [\App\Http\Controllers\SuperAdminController::class, 'getDashboardData']);
+
         Route::get('/stats', [\App\Http\Controllers\SuperAdminController::class, 'getStats']);
         Route::get('/bandas', [\App\Http\Controllers\SuperAdminController::class, 'listBandas']);
         Route::post('/bandas', [\App\Http\Controllers\SuperAdminController::class, 'createBanda']);

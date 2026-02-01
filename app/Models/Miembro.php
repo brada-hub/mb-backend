@@ -30,52 +30,52 @@ class Miembro extends Model
         'id_banda'
     ];
 
-    public function user()
+    public function user(): \Illuminate\Database\Eloquent\Relations\HasOne
     {
         return $this->hasOne(User::class, 'id_miembro');
     }
 
-    public function categoria()
+    public function categoria(): \Illuminate\Database\Eloquent\Relations\BelongsTo
     {
         return $this->belongsTo(Categoria::class, 'id_categoria');
     }
 
-    public function seccion()
+    public function seccion(): \Illuminate\Database\Eloquent\Relations\BelongsTo
     {
         return $this->belongsTo(Seccion::class, 'id_seccion');
     }
 
-    public function instrumento()
+    public function instrumento(): \Illuminate\Database\Eloquent\Relations\BelongsTo
     {
         return $this->belongsTo(Instrumento::class, 'id_instrumento');
     }
 
-    public function voz()
+    public function voz(): \Illuminate\Database\Eloquent\Relations\BelongsTo
     {
         return $this->belongsTo(VozInstrumental::class, 'id_voz');
     }
 
-    public function rol()
+    public function rol(): \Illuminate\Database\Eloquent\Relations\BelongsTo
     {
         return $this->belongsTo(Rol::class, 'id_rol');
     }
 
-    public function contactos()
+    public function contactos(): \Illuminate\Database\Eloquent\Relations\HasMany
     {
         return $this->hasMany(ContactoReferencia::class, 'id_miembro');
     }
 
-    public function convocatorias()
+    public function convocatorias(): \Illuminate\Database\Eloquent\Relations\HasMany
     {
         return $this->hasMany(ConvocatoriaEvento::class, 'id_miembro');
     }
 
-    public function asistencias()
+    public function asistencias(): \Illuminate\Database\Eloquent\Relations\HasManyThrough
     {
         return $this->hasManyThrough(Asistencia::class, ConvocatoriaEvento::class, 'id_miembro', 'id_convocatoria', 'id_miembro', 'id_convocatoria');
     }
 
-    public function permisos()
+    public function permisos(): \Illuminate\Database\Eloquent\Relations\BelongsToMany
     {
         return $this->belongsToMany(Permiso::class, 'miembro_permiso', 'id_miembro', 'id_permiso')
                     ->withPivot('estado_booleano')

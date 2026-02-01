@@ -141,7 +141,7 @@ class AsistenciaController extends Controller
             if ($conv->miembro && $conv->miembro->user) {
                 \App\Models\Notificacion::enviar(
                     $conv->miembro->user->id_user,
-                    "Registro de Inasistencia ⚠️",
+                    "Registro de Inasistencia",
                     "Se ha registrado una FALTA en tu historial para el evento: {$evento->evento}.",
                     $evento->id_evento,
                     'asistencia',
@@ -176,7 +176,7 @@ class AsistenciaController extends Controller
             if ($conv->miembro && $conv->miembro->user) {
                 $status = \App\Models\Notificacion::enviar(
                     $conv->miembro->user->id_user,
-                    "¿Ya llegaste? 🥁",
+                    "¿Ya llegaste?",
                     "Aún no registras tu asistencia para: {$evento->evento}. ¡Hazlo antes de que cierre!",
                     $evento->id_evento,
                     'asistencia',
