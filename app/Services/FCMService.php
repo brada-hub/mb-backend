@@ -85,17 +85,26 @@ class FCMService
         $serviceAccountPath = storage_path('app/firebase-service-account.json');
 
         if (!file_exists($serviceAccountPath)) {
-            Log::error("FCM: Archivo firebase-service-account.json no encontrado en storage/app/");
+            Log::error("FCM: Archivo firebase-service-account.json NO ENCONTRADO en: " . $serviceAccountPath);
             return null;
         }
 
         try {
             $serviceAccount = json_decode(file_get_contents($serviceAccountPath), true);
+            if (!$serviceAccount || !isset($serviceAccount['private_key']) || !isset($serviceAccount['client_email'])) {
+                Log::error("FCM: El archivo JSON del Service Account tiene un formato inválido.");
+                return null;
+            }
 
             // Crear JWT
             $now = time();
-            $header = base64_encode(json_encode(['alg' => 'RS256', 'typ' => 'JWT']));
-            $payload = base64_encode(json_encode([
+            // Helper function para Base64Url (estándar para JWT)
+            $b64Url = function($data) {
+                return str_replace(['+', '/', '='], ['-', '_', ''], base64_encode($data));
+            };
+
+            $header = $b64Url(json_encode(['alg' => 'RS256', 'typ' => 'JWT']));
+            $payload = $b64Url(json_encode([
                 'iss' => $serviceAccount['client_email'],
                 'scope' => 'https://www.googleapis.com/auth/firebase.messaging',
                 'aud' => 'https://oauth2.googleapis.com/token',
@@ -105,8 +114,13 @@ class FCMService
 
             // Firmar JWT
             $privateKey = openssl_pkey_get_private($serviceAccount['private_key']);
+            if (!$privateKey) {
+                Log::error("FCM: No se pudo obtener la clave privada de openssl. Verifique el formato de 'private_key' en el JSON.");
+                return null;
+            }
+
             openssl_sign("$header.$payload", $signature, $privateKey, OPENSSL_ALGO_SHA256);
-            $jwt = "$header.$payload." . base64_encode($signature);
+            $jwt = "$header.$payload." . $b64Url($signature);
 
             // Intercambiar JWT por access token
             $response = Http::asForm()->post('https://oauth2.googleapis.com/token', [
@@ -120,7 +134,7 @@ class FCMService
                 Cache::put('fcm_access_token', $accessToken, 3000);
                 return $accessToken;
             } else {
-                Log::error("FCM: Error obteniendo access token: " . $response->body());
+                Log::error("FCM: Error en respuesta de OAuth2: " . $response->body());
                 return null;
             }
         } catch (\Exception $e) {

@@ -53,6 +53,7 @@ class Notificacion extends Model
 
         // 3. Notificación Push Real (Firebase)
         if ($notificacion && $user && $user->fcm_token) {
+            \Illuminate\Support\Facades\Log::info("Enviando Push para usuario {$user->id_user} por evento: {$titulo}");
             \App\Services\FCMService::enviarPush(
                 $user->fcm_token,
                 $titulo,

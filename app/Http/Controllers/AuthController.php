@@ -30,6 +30,40 @@ class AuthController extends Controller
             }
         }
 
+        // 4. Device Bonding (Only for Mobile - includes android, ios, mobile)
+        $isMobilePlatform = in_array($request->platform, ['mobile', 'android', 'ios']);
+        if ($isMobilePlatform && $request->uuid_celular) {
+            // Check if THIS specific device is already registered
+            $currentDevice = DispositivoAutorizado::where('id_user', $user->id_user)
+                                                  ->where('uuid_celular', $request->uuid_celular)
+                                                  ->first();
+
+            if ($currentDevice) {
+                // Device exists. Check if it's explicitly blocked.
+                if (!$currentDevice->estado) {
+                    return response()->json(['message' => 'Este dispositivo ha sido bloqueado. Contacte al administrador.'], 403);
+                }
+            } else {
+                // New device. Check dynamic limit (Exempt SuperAdmins)
+                if (!$user->isSuperAdmin()) {
+                    $count = DispositivoAutorizado::where('id_user', $user->id_user)->count();
+                    $limit = $user->limite_dispositivos ?? 1; // Default to 1 if null
+
+                    if ($count >= $limit) {
+                        return response()->json(['message' => "Límite de dispositivos alcanzado ({$limit}). Solicita más accesos o elimina uno antiguo."], 403);
+                    }
+                }
+
+                // Auto-register new device
+                DispositivoAutorizado::create([
+                    'id_user' => $user->id_user,
+                    'uuid_celular' => $request->uuid_celular,
+                    'nombre_modelo' => $request->device_model ?? 'Dispositivo Móvil',
+                    'estado' => true // Active by default
+                ]);
+            }
+        }
+
         // 2. Super Admin bypass - no necesita miembro
         if ($user->isSuperAdmin()) {
             $token = $user->createToken($request->platform . '-token')->plainTextToken;
@@ -62,37 +96,6 @@ class AuthController extends Controller
             }
         }
 
-        // 4. Device Bonding (Only for Mobile - includes android, ios, mobile)
-        $isMobilePlatform = in_array($request->platform, ['mobile', 'android', 'ios']);
-        if ($isMobilePlatform && $request->uuid_celular) {
-            // Check if THIS specific device is already registered
-            $currentDevice = DispositivoAutorizado::where('id_user', $user->id_user)
-                                                  ->where('uuid_celular', $request->uuid_celular)
-                                                  ->first();
-
-            if ($currentDevice) {
-                // Device exists. Check if it's explicitly blocked.
-                if (!$currentDevice->estado) {
-                    return response()->json(['message' => 'Este dispositivo ha sido bloqueado. Contacte al administrador.'], 403);
-                }
-            } else {
-                // New device. Check dynamic limit
-                $count = DispositivoAutorizado::where('id_user', $user->id_user)->count();
-                $limit = $user->limite_dispositivos ?? 1; // Default to 1 if null
-
-                if ($count >= $limit) {
-                    return response()->json(['message' => "Límite de dispositivos alcanzado ({$limit}). Solicita más accesos o elimina uno antiguo."], 403);
-                }
-
-                // Auto-register new device
-                DispositivoAutorizado::create([
-                    'id_user' => $user->id_user,
-                    'uuid_celular' => $request->uuid_celular,
-                    'nombre_modelo' => $request->device_model ?? 'Dispositivo Móvil',
-                    'estado' => true // Active by default
-                ]);
-            }
-        }
 
         $token = $user->createToken($request->platform . '-token')->plainTextToken;
 
@@ -238,6 +241,9 @@ class AuthController extends Controller
     {
         $request->validate(['fcm_token' => 'required|string']);
         $user = $request->user();
+
+        \Illuminate\Support\Facades\Log::info("Actualizando FCM Token para usuario {$user->id_user}: " . substr($request->fcm_token, 0, 15) . "...");
+
         $user->fcm_token = $request->fcm_token;
         $user->save();
 

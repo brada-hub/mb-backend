@@ -17,6 +17,12 @@ use App\Http\Controllers\MixController;
 use App\Http\Controllers\DashboardController;
 
 Route::get('/test-roles', function() { return response()->json(['status' => 'ok']); });
+Route::get('/test-push', function() {
+    $user = auth()->user();
+    if (!$user->fcm_token) return response()->json(['error' => 'No FCM token for user'], 400);
+    $sent = \App\Services\FCMService::enviarPush($user->fcm_token, "Prueba", "Esta es una notificación de prueba");
+    return response()->json(['sent' => $sent]);
+})->middleware('auth:sanctum');
 
 // Public Auth routes only (login, check-device)
 Route::post('/login', [AuthController::class, 'login']);
@@ -32,7 +38,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/complete-profile', [AuthController::class, 'completeProfile']);
     Route::post('/update-preferences', [AuthController::class, 'updatePreferences']);
     Route::post('/update-theme', [AuthController::class, 'updateTheme']);
-    Route::post('/update-fcm-token', [AuthController::class, 'updateFCMToken'])->middleware('plan.limits:NOTIFICACIONES_PUSH');
+    Route::post('/update-fcm-token', [AuthController::class, 'updateFCMToken']);
 
     // Dashboard
     Route::get('/dashboard/stats', [DashboardController::class, 'getStats']);
