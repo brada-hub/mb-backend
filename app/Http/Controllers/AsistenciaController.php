@@ -29,9 +29,12 @@ class AsistenciaController extends Controller
 
         // Agregar info de si el control de asistencia está habilitado
         $eventos = $eventos->map(function($evento) {
-            // Fix: Asegurar formato de fecha para evitar errores de parseo con Carbon
-            $fechaStr = ($evento->fecha instanceof Carbon) ? $evento->fecha->format('Y-m-d') : $evento->fecha;
-            $horaEvento = Carbon::parse($fechaStr . ' ' . $evento->hora, 'America/La_Paz');
+            // Asegurar que solo tomamos la parte de la fecha (Y-m-d) para evitar "Double time specification"
+            $fechaBase = ($evento->fecha instanceof \Carbon\Carbon)
+                ? $evento->fecha->format('Y-m-d')
+                : substr($evento->fecha, 0, 10);
+
+            $horaEvento = Carbon::parse($fechaBase . ' ' . $evento->hora, 'America/La_Paz');
             $ahora = Carbon::now('America/La_Paz');
 
             $tipo = $evento->tipo;
@@ -76,9 +79,9 @@ class AsistenciaController extends Controller
             ->with(['miembro.instrumento', 'miembro.seccion', 'asistencia'])
             ->get();
 
-        // Calcular hora del evento para referencia
-        $fechaStr = ($evento->fecha instanceof Carbon) ? $evento->fecha->format('Y-m-d') : $evento->fecha;
-        $horaEvento = Carbon::parse($fechaStr . ' ' . $evento->hora, 'America/La_Paz');
+        // Calcular hora del evento para referencia (Extract date part only)
+        $fechaBase = ($evento->fecha instanceof \Carbon\Carbon) ? $evento->fecha->format('Y-m-d') : substr($evento->fecha, 0, 10);
+        $horaEvento = Carbon::parse($fechaBase . ' ' . $evento->hora, 'America/La_Paz');
         $ahora = Carbon::now('America/La_Paz');
 
         $tipo = $evento->tipo;
@@ -228,8 +231,8 @@ class AsistenciaController extends Controller
         $convocatoria = ConvocatoriaEvento::with('evento')->findOrFail($request->id_convocatoria);
         $evento = $convocatoria->evento;
 
-        $fechaStr = ($evento->fecha instanceof Carbon) ? $evento->fecha->format('Y-m-d') : $evento->fecha;
-        $horaEvento = Carbon::parse($fechaStr . ' ' . $evento->hora, 'America/La_Paz');
+        $fechaBase = ($evento->fecha instanceof Carbon) ? $evento->fecha->format('Y-m-d') : substr($evento->fecha, 0, 10);
+        $horaEvento = Carbon::parse($fechaBase . ' ' . $evento->hora, 'America/La_Paz');
         $ahora = Carbon::now('America/La_Paz');
 
         // Registro Sellado tras N horas configuradas por tipo
@@ -309,8 +312,9 @@ class AsistenciaController extends Controller
         ]);
 
         $evento = Evento::findOrFail($request->id_evento);
-        $fechaStr = ($evento->fecha instanceof Carbon) ? $evento->fecha->format('Y-m-d') : $evento->fecha;
-        $horaEvento = Carbon::parse($fechaStr . ' ' . $evento->hora, 'America/La_Paz');
+
+        $fechaBase = ($evento->fecha instanceof Carbon) ? $evento->fecha->format('Y-m-d') : substr($evento->fecha, 0, 10);
+        $horaEvento = Carbon::parse($fechaBase . ' ' . $evento->hora, 'America/La_Paz');
         $ahora = Carbon::now('America/La_Paz');
 
         // Registro Sellado tras N horas configuradas por tipo
@@ -332,8 +336,8 @@ class AsistenciaController extends Controller
             return response()->json(['message' => 'No tienes permisos para realizar marcados masivos.'], 403);
         }
 
-        $fechaStr = ($evento->fecha instanceof Carbon) ? $evento->fecha->format('Y-m-d') : $evento->fecha;
-        $horaEvento = Carbon::parse($fechaStr . ' ' . $evento->hora, 'America/La_Paz');
+        $fechaBase = ($evento->fecha instanceof Carbon) ? $evento->fecha->format('Y-m-d') : substr($evento->fecha, 0, 10);
+        $horaEvento = Carbon::parse($fechaBase . ' ' . $evento->hora, 'America/La_Paz');
         $ahora = Carbon::now('America/La_Paz');
 
         $registros = [];
@@ -437,8 +441,8 @@ class AsistenciaController extends Controller
         $tipo = $evento->tipo;
 
         $now = Carbon::now('America/La_Paz');
-        $fechaStr = ($evento->fecha instanceof Carbon) ? $evento->fecha->format('Y-m-d') : $evento->fecha;
-        $horaEvento = Carbon::parse($fechaStr . ' ' . $evento->hora, 'America/La_Paz');
+        $fechaBase = ($evento->fecha instanceof Carbon) ? $evento->fecha->format('Y-m-d') : substr($evento->fecha, 0, 10);
+        $horaEvento = Carbon::parse($fechaBase . ' ' . $evento->hora, 'America/La_Paz');
 
         // --- VALIDACIÓN GEOGRÁFICA ---
         if ($evento->latitud && $evento->longitud) {
