@@ -81,4 +81,27 @@ class Miembro extends Model
                     ->withPivot('estado_booleano')
                     ->withTimestamps();
     }
+
+    public function calculateStreak(): int
+    {
+        $records = \Illuminate\Support\Facades\DB::table('convocatoria_evento')
+            ->join('eventos', 'convocatoria_evento.id_evento', '=', 'eventos.id_evento')
+            ->leftJoin('asistencias', 'convocatoria_evento.id_convocatoria', '=', 'asistencias.id_convocatoria')
+            ->where('convocatoria_evento.id_miembro', $this->id_miembro)
+            ->where('eventos.fecha', '<', \Carbon\Carbon::today()->toDateString())
+            ->where('eventos.estado', true)
+            ->select('asistencias.estado', 'eventos.fecha')
+            ->orderBy('eventos.fecha', 'desc')
+            ->get();
+
+        $streak = 0;
+        foreach ($records as $rec) {
+            if (in_array($rec->estado, ['PUNTUAL', 'RETRASO'])) {
+                $streak++;
+            } else if ($rec->estado === 'FALTA' || is_null($rec->estado)) {
+                break;
+            }
+        }
+        return $streak;
+    }
 }

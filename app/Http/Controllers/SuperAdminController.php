@@ -71,21 +71,18 @@ class SuperAdminController extends Controller
             ];
 
             // Storage (simplified)
-            $storage = $bandas->map(function($banda) {
-                $archivosCount = Archivo::whereHas('recurso.tema', fn($q) => $q->where('id_banda', $banda->id_banda))->count();
-                $estimatedMb = round($archivosCount * 0.5, 2);
+                $currentMb = $banda->getCurrentStorageMb();
                 $limitMb = $banda->subscriptionPlan->storage_mb ?? 100;
                 return [
                     'id_banda' => $banda->id_banda,
                     'nombre' => $banda->nombre,
                     'plan' => $banda->subscriptionPlan->label ?? $banda->plan,
-                    'current_mb' => $estimatedMb,
+                    'current_mb' => $currentMb,
                     'limit_mb' => $limitMb,
-                    'percent' => $limitMb > 0 ? round(($estimatedMb / $limitMb) * 100, 1) : 0,
-                    'status' => $estimatedMb > $limitMb ? 'OVER_LIMIT' : ($estimatedMb > ($limitMb * 0.9) ? 'WARNING' : 'OK'),
-                    'files_count' => $archivosCount
+                    'percent' => $limitMb > 0 ? round(($currentMb / $limitMb) * 100, 1) : 0,
+                    'status' => $currentMb > $limitMb ? 'OVER_LIMIT' : ($currentMb > ($limitMb * 0.9) ? 'WARNING' : 'OK'),
+                    'files_count' => Archivo::whereHas('recurso.tema', fn($q) => $q->where('id_banda', $banda->id_banda))->count()
                 ];
-            });
 
             return [
                 'stats' => $stats,
@@ -175,6 +172,11 @@ class SuperAdminController extends Controller
                 'notificaciones_habilitadas' => true
             ]);
             $banda->saveQuietly();
+
+            Cache::forget('superadmin.dashboard');
+            Cache::forget('superadmin.bandas');
+            Cache::forget('superadmin.stats');
+            Cache::forget('superadmin.storage');
 
             // Crear catálogos por defecto para la nueva banda
             $this->seedDefaultCatalogs($banda->id_banda);
@@ -329,6 +331,11 @@ class SuperAdminController extends Controller
 
         $banda->update($data);
 
+        Cache::forget('superadmin.dashboard');
+        Cache::forget('superadmin.bandas');
+        Cache::forget('superadmin.stats');
+        Cache::forget('superadmin.storage');
+
         return response()->json($banda);
     }
 
@@ -473,24 +480,18 @@ class SuperAdminController extends Controller
                 ->get();
 
             return $bandas->map(function($banda) {
-                // Estimación rápida basada en conteo de archivos (evita leer filesystem)
-                $archivosCount = Archivo::whereHas('recurso.tema', function($q) use ($banda) {
-                    $q->where('id_banda', $banda->id_banda);
-                })->count();
-
-                // Estimación: ~500KB promedio por archivo
-                $estimatedMb = round($archivosCount * 0.5, 2);
+                $currentMb = $banda->getCurrentStorageMb();
                 $limitMb = $banda->subscriptionPlan->storage_mb ?? 100;
 
                 return [
                     'id_banda' => $banda->id_banda,
                     'nombre' => $banda->nombre,
                     'plan' => $banda->subscriptionPlan->label ?? $banda->plan,
-                    'current_mb' => $estimatedMb,
+                    'current_mb' => $currentMb,
                     'limit_mb' => $limitMb,
-                    'percent' => $limitMb > 0 ? round(($estimatedMb / $limitMb) * 100, 1) : 0,
-                    'status' => $estimatedMb > $limitMb ? 'OVER_LIMIT' : ($estimatedMb > ($limitMb * 0.9) ? 'WARNING' : 'OK'),
-                    'files_count' => $archivosCount
+                    'percent' => $limitMb > 0 ? round(($currentMb / $limitMb) * 100, 1) : 0,
+                    'status' => $currentMb > $limitMb ? 'OVER_LIMIT' : ($currentMb > ($limitMb * 0.9) ? 'WARNING' : 'OK'),
+                    'files_count' => Archivo::whereHas('recurso.tema', fn($q) => $q->where('id_banda', $banda->id_banda))->count()
                 ];
             });
         }));
@@ -517,6 +518,8 @@ class SuperAdminController extends Controller
         ]);
 
         $plan = Plan::create($data);
+        Cache::forget('superadmin.plans');
+        Cache::forget('superadmin.dashboard');
         return response()->json($plan, 201);
     }
 
@@ -545,6 +548,11 @@ class SuperAdminController extends Controller
                 ->update(['max_miembros' => $plan->max_miembros]);
         }
 
+        Cache::forget('superadmin.plans');
+        Cache::forget('superadmin.dashboard');
+        Cache::forget('superadmin.bandas');
+        Cache::forget('superadmin.storage');
+
         return response()->json($plan);
     }
 
@@ -555,6 +563,8 @@ class SuperAdminController extends Controller
             return response()->json(['message' => 'No se puede eliminar un plan que tiene bandas asociadas.'], 400);
         }
         $plan->delete();
+        Cache::forget('superadmin.plans');
+        Cache::forget('superadmin.dashboard');
         return response()->json(['message' => 'Plan eliminado correctamente.']);
     }
 }

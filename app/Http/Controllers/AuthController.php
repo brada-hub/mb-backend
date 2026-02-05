@@ -30,36 +30,54 @@ class AuthController extends Controller
             }
         }
 
-        // 4. Device Bonding (Only for Mobile - includes android, ios, mobile)
+        // 4. Device Bonding (Only for Mobile)
         $isMobilePlatform = in_array($request->platform, ['mobile', 'android', 'ios']);
         if ($isMobilePlatform && $request->uuid_celular) {
-            // Check if THIS specific device is already registered
+
+            // SEGURIDAD: Validar que el dispositivo no esté configurado con otro usuario
+            $dispositivoAjeno = DispositivoAutorizado::where('uuid_celular', $request->uuid_celular)
+                                                      ->where('id_user', '!=', $user->id_user)
+                                                      ->first();
+
+            if ($dispositivoAjeno) {
+                return response()->json([
+                    'message' => 'Este dispositivo ya está vinculado a otra cuenta. Contacta a soporte para liberarlo.'
+                ], 403);
+            }
+
+            // Verificar si este dispositivo ya está registrado para este usuario
             $currentDevice = DispositivoAutorizado::where('id_user', $user->id_user)
                                                   ->where('uuid_celular', $request->uuid_celular)
                                                   ->first();
 
             if ($currentDevice) {
-                // Device exists. Check if it's explicitly blocked.
                 if (!$currentDevice->estado) {
                     return response()->json(['message' => 'Este dispositivo ha sido bloqueado. Contacte al administrador.'], 403);
                 }
+                // Actualizar token FCM
+                if ($request->fcm_token) {
+                    $currentDevice->update(['fcm_token' => $request->fcm_token]);
+                }
             } else {
-                // New device. Check dynamic limit (Exempt SuperAdmins)
+                // Nuevo dispositivo. Validar límite
                 if (!$user->isSuperAdmin()) {
                     $count = DispositivoAutorizado::where('id_user', $user->id_user)->count();
-                    $limit = $user->limite_dispositivos ?? 1; // Default to 1 if null
+                    $limit = $user->limite_dispositivos ?? 2;
 
                     if ($count >= $limit) {
-                        return response()->json(['message' => "Límite de dispositivos alcanzado ({$limit}). Solicita más accesos o elimina uno antiguo."], 403);
+                        return response()->json([
+                            'message' => "Límite de dispositivos alcanzado ({$limit}). Contacta a tu Director para habilitar más accesos."
+                        ], 403);
                     }
                 }
 
-                // Auto-register new device
+                // Registrar nuevo dispositivo
                 DispositivoAutorizado::create([
                     'id_user' => $user->id_user,
                     'uuid_celular' => $request->uuid_celular,
                     'nombre_modelo' => $request->device_model ?? 'Dispositivo Móvil',
-                    'estado' => true // Active by default
+                    'fcm_token' => $request->fcm_token,
+                    'estado' => true
                 ]);
             }
         }
@@ -101,12 +119,13 @@ class AuthController extends Controller
 
         return response()->json([
             'token' => $token,
-            'user' => $user->load('miembro.rol', 'miembro.permisos'),
+            'user' => $user->load('miembro.rol', 'miembro.permisos', 'miembro.instrumento', 'miembro.categoria'),
             'role' => $roleName,
             'permissions' => $allPermissions,
             'password_changed' => $user->password_changed,
             'profile_completed' => $user->profile_completed,
-            'is_super_admin' => false
+            'is_super_admin' => false,
+            'streak' => $user->miembro ? $user->miembro->calculateStreak() : 0
         ]);
     }
 
@@ -150,7 +169,7 @@ class AuthController extends Controller
             ]);
         }
 
-        $user->load('miembro.rol.permisos', 'miembro.permisos', 'miembro.seccion', 'banda');
+        $user->load('miembro.rol.permisos', 'miembro.permisos', 'miembro.seccion', 'miembro.instrumento', 'miembro.categoria', 'banda');
 
         // Validar que tenga miembro asociado
         if (!$user->miembro) {
@@ -166,7 +185,8 @@ class AuthController extends Controller
             'role' => $user->miembro->rol->rol ?? 'Sin Rol',
             'permissions' => $allPermissions,
             'password_changed' => $user->password_changed,
-            'profile_completed' => $user->profile_completed
+            'profile_completed' => $user->profile_completed,
+            'streak' => $user->miembro->calculateStreak()
         ]);
     }
 
@@ -201,6 +221,31 @@ class AuthController extends Controller
             'password_changed' => true,
             'profile_completed' => $user->profile_completed
         ]);
+    }
+
+    public function updatePassword(Request $request)
+    {
+        $request->validate([
+            'current_password' => 'required|string',
+            'password' => 'required|string|min:8|confirmed',
+        ]);
+
+        $user = $request->user();
+
+        if (!Hash::check($request->current_password, $user->password)) {
+            return response()->json(['message' => 'La contraseña actual es incorrecta'], 422);
+        }
+
+        $user->update([
+            'password' => Hash::make($request->password),
+            'password_changed' => true
+        ]);
+
+        // Revocar otros dispositivos por seguridad
+        $currentTokenId = $user->currentAccessToken()->id;
+        $user->tokens()->where('id', '!=', $currentTokenId)->delete();
+
+        return response()->json(['message' => 'Contraseña actualizada correctamente']);
     }
 
     public function syncMasterData()
@@ -239,13 +284,23 @@ class AuthController extends Controller
 
     public function updateFCMToken(Request $request)
     {
-        $request->validate(['fcm_token' => 'required|string']);
+        $request->validate([
+            'fcm_token' => 'required|string',
+            'uuid_celular' => 'nullable|string'
+        ]);
+
         $user = $request->user();
 
-        \Illuminate\Support\Facades\Log::info("Actualizando FCM Token para usuario {$user->id_user}: " . substr($request->fcm_token, 0, 15) . "...");
-
-        $user->fcm_token = $request->fcm_token;
-        $user->save();
+        if ($request->uuid_celular) {
+            // Actualizar Token en el dispositivo específico
+            DispositivoAutorizado::where('id_user', $user->id_user)
+                ->where('uuid_celular', $request->uuid_celular)
+                ->update(['fcm_token' => $request->fcm_token]);
+        } else {
+            // Fallback: Guardar en el user para compatibilidad
+            $user->fcm_token = $request->fcm_token;
+            $user->save();
+        }
 
         return response()->json(['status' => 'ok']);
     }

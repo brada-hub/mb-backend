@@ -189,28 +189,16 @@ class EventoController extends Controller
                 }
             }
 
-            // Logic for ENSAYO: Auto-convoke everyone
+            // Logic for ENSAYO: Auto-convoke everyone (no instant notification)
             $tipo = TipoEvento::find($request->id_tipo_evento);
             if ($tipo && strtoupper($tipo->evento) === 'ENSAYO') {
-                $miembros = Miembro::with('user')->get();
+                $miembros = Miembro::all();
                 foreach ($miembros as $miembro) {
-                    $conv = ConvocatoriaEvento::create([
+                    ConvocatoriaEvento::create([
                         'id_evento' => $evento->id_evento,
                         'id_miembro' => $miembro->id_miembro,
                         'confirmado_por_director' => true
                     ]);
-
-                    // Notificación instantánea para ensayos
-                    if ($miembro->user) {
-                        \App\Models\Notificacion::enviar(
-                            $miembro->user->id_user,
-                            "Nuevo Ensayo Agendado",
-                            "Se ha programado: {$evento->evento} para el " . \Carbon\Carbon::parse($evento->fecha)->format('d/m') . " a las " . \Carbon\Carbon::parse($evento->hora)->format('H:i'),
-                            $conv->id_convocatoria,
-                            'convocatoria',
-                            '/dashboard/agenda'
-                        );
-                    }
                 }
             }
 

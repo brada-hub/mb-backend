@@ -15,7 +15,8 @@ class DispositivoAutorizado extends Model
         'nombre_modelo',
         'fecha_registro',
         'estado',
-        'id_user'
+        'id_user',
+        'fcm_token'
     ];
 
     public function user()

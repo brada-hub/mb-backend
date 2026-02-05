@@ -9,6 +9,7 @@ use App\Models\Tema;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Cache;
 
 class RecursoController extends Controller
 {
@@ -165,6 +166,9 @@ class RecursoController extends Controller
 
             DB::commit();
 
+            Cache::forget('superadmin.storage');
+            Cache::forget('superadmin.dashboard');
+
             return response()->json($recurso->load(['tema.genero', 'instrumento.seccion', 'voz', 'archivos']), 201);
 
         } catch (\Exception $e) {
@@ -266,6 +270,10 @@ class RecursoController extends Controller
             }
 
             DB::commit();
+
+            Cache::forget('superadmin.storage');
+            Cache::forget('superadmin.dashboard');
+
             return response()->json($recurso->load(['archivos']));
 
         } catch (\Exception $e) {
@@ -289,6 +297,9 @@ class RecursoController extends Controller
 
         // Delete DB record (Cascades delete to archivos table, but we deleted files above)
         $recurso->delete();
+
+        Cache::forget('superadmin.storage');
+        Cache::forget('superadmin.dashboard');
 
         return response()->json(['message' => 'Recurso eliminado correctamente']);
     }

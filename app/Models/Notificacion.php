@@ -29,12 +29,13 @@ class Notificacion extends Model
             }
         }
 
-        // 2. Anti-spam: No enviar la misma notificación al mismo usuario en los últimos 5 minutos
+        // 2. Anti-spam: No enviar la misma notificación al mismo usuario en corto tiempo
         if ($tipo && $id_referencia) {
+            $minutosRemans = ($tipo === 'recordatorio_evento') ? 180 : 5; // 3 horas para recordatorios
             $reciente = self::where('id_user', $id_user)
                 ->where('tipo', $tipo)
                 ->where('id_referencia', $id_referencia)
-                ->where('created_at', '>=', now()->subMinutes(5))
+                ->where('created_at', '>=', now()->subMinutes($minutosRemans))
                 ->first();
 
             if ($reciente) return $reciente;
@@ -52,14 +53,29 @@ class Notificacion extends Model
         ]);
 
         // 3. Notificación Push Real (Firebase)
-        if ($notificacion && $user && $user->fcm_token) {
-            \Illuminate\Support\Facades\Log::info("Enviando Push para usuario {$user->id_user} por evento: {$titulo}");
-            \App\Services\FCMService::enviarPush(
-                $user->fcm_token,
-                $titulo,
-                $mensaje,
-                $ruta
-            );
+        if ($notificacion && $user) {
+            // Obtener todos los tokens de todos los dispositivos activos del usuario
+            $tokens = DispositivoAutorizado::where('id_user', $user->id_user)
+                ->where('estado', true)
+                ->whereNotNull('fcm_token')
+                ->pluck('fcm_token')
+                ->unique()
+                ->toArray();
+
+            // Si no hay tokens en la tabla de dispositivos, intentar con el token único del usuario (legacy)
+            if (empty($tokens) && $user->fcm_token) {
+                $tokens[] = $user->fcm_token;
+            }
+
+            if (!empty($tokens)) {
+                \Illuminate\Support\Facades\Log::info("FCM: Enviando alerta a " . count($tokens) . " dispositivos del usuario {$user->id_user}");
+                \App\Services\FCMService::enviarPushMasivo(
+                    $tokens,
+                    $titulo,
+                    $mensaje,
+                    $ruta
+                );
+            }
         }
 
         return $notificacion;

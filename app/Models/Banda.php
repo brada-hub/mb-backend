@@ -107,8 +107,11 @@ class Banda extends Model
         })->get();
 
         foreach ($archivos as $archivo) {
-            $path = str_replace('/storage/', '', $archivo->url_archivo);
-            if (Storage::disk('public')->exists($path)) {
+            // Usamos getRawOriginal para obtener la ruta de la DB y no el URL del accesor
+            $rawPath = $archivo->getRawOriginal('url_archivo');
+            $path = str_replace('storage/', '', $rawPath);
+
+            if ($path && Storage::disk('public')->exists($path)) {
                 $totalBytes += Storage::disk('public')->size($path);
             }
         }

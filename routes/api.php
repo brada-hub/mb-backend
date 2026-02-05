@@ -38,6 +38,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/complete-profile', [AuthController::class, 'completeProfile']);
     Route::post('/update-preferences', [AuthController::class, 'updatePreferences']);
     Route::post('/update-theme', [AuthController::class, 'updateTheme']);
+    Route::post('/update-password', [AuthController::class, 'updatePassword']);
     Route::post('/update-fcm-token', [AuthController::class, 'updateFCMToken']);
 
     // Dashboard
@@ -135,6 +136,8 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/notificaciones/unread-count', [NotificacionController::class, 'unreadCount']);
     Route::post('/notificaciones/marcar-todas', [NotificacionController::class, 'marcarTodasLeidas']);
     Route::patch('/notificaciones/{id}/leer', [NotificacionController::class, 'leer']);
+    Route::post('/notificaciones/broadcast', [NotificacionController::class, 'broadcast']);
+    Route::get('/notificaciones/seguimiento/{id_referencia}/{tipo}', [NotificacionController::class, 'getLectores']);
 
     // ========== SUPER ADMIN ROUTES ==========
     Route::prefix('superadmin')->group(function () {
