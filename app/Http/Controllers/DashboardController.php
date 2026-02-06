@@ -70,14 +70,16 @@ class DashboardController extends Controller
         // 5. Heatmap Data (Restringido para Músicos/Jefes)
         $heatmapData = $this->getHeatmapData($isMusico, $user, $isJefe);
 
-        // 6. User Specific Data (Sin cambios para eventos personales)
+        // 6. User Specific Data (Hoy + Próximos Confirmados)
         $misEventos = collect();
         if ($user->miembro) {
             $misEventos = Evento::with('tipo')
-                ->whereDate('fecha', Carbon::today())
+                ->where('fecha', '>=', Carbon::today()->toDateString())
                 ->whereHas('convocatorias', function($q) use ($user) {
                     $q->where('id_miembro', $user->miembro->id_miembro);
                 })
+                ->orderBy('fecha', 'asc')
+                ->orderBy('hora', 'asc')
                 ->get()
                 ->map(function($evento) use ($user) {
                     $fechaStr = ($evento->fecha instanceof Carbon) ? $evento->fecha->format('Y-m-d') : $evento->fecha;
@@ -88,6 +90,8 @@ class DashboardController extends Controller
                     $minCierre = $evento->minutos_cierre ?? ($evento->tipo ? ($evento->tipo->minutos_cierre ?? 60) : 60);
 
                     $evento->puede_marcar = $ahora->between($horaEvento->copy()->subMinutes($minAntes), $horaEvento->copy()->addMinutes($minCierre));
+                    $evento->es_hoy = Carbon::today()->toDateString() === $fechaStr;
+
                     $evento->asistencia = Asistencia::whereHas('convocatoria', function($q) use ($evento, $user) {
                         $q->where('id_evento', $evento->id_evento)->where('id_miembro', $user->miembro->id_miembro);
                     })->first();
