@@ -31,8 +31,11 @@ class MixController extends Controller
         }
 
         // Si no es admin, solo ver los activos
-        if (!$isAdmin && \Illuminate\Support\Facades\Schema::hasColumn('mixes', 'activo')) {
-            $query->where('activo', true);
+        if (!$isAdmin) {
+             // Verificar si la columna existe para evitar errores en migraciones viejas, aunque ya debería estar
+            if (\Illuminate\Support\Facades\Schema::hasColumn('mixes', 'activo')) {
+                $query->where('activo', true);
+            }
         }
 
         return $query->get();
