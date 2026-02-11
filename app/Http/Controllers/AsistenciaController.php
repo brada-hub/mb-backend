@@ -19,47 +19,48 @@ class AsistenciaController extends Controller
     {
         $hoy = Carbon::now('America/La_Paz')->toDateString();
 
-        $eventos = Evento::with(['tipo', 'convocatorias' => function($q) {
-                $q->where('confirmado_por_director', true)
-                  ->with(['miembro.instrumento', 'asistencia']);
+        // Optimized query: Only load 'tipo' and count of convocatorias
+        $eventos = Evento::with('tipo')
+            ->withCount(['convocatorias' => function($q) {
+                $q->where('confirmado_por_director', true);
             }])
             ->whereDate('fecha', $hoy)
             ->orderBy('hora')
             ->get();
 
-        // Agregar info de si el control de asistencia está habilitado
-        $eventos = $eventos->map(function($evento) {
-            // Asegurar que solo tomamos la parte de la fecha (Y-m-d) para evitar "Double time specification"
+        // Agregar info de control de asistencia
+        $ahora = Carbon::now('America/La_Paz');
+
+        $eventos = $eventos->map(function($evento) use ($ahora) {
+            // Validar fecha para evitar errores de parseo
             $fechaBase = ($evento->fecha instanceof \Carbon\Carbon)
                 ? $evento->fecha->format('Y-m-d')
                 : substr($evento->fecha, 0, 10);
 
             $horaEvento = Carbon::parse($fechaBase . ' ' . $evento->hora, 'America/La_Paz');
-            $ahora = Carbon::now('America/La_Paz');
 
             $tipo = $evento->tipo;
-            // Robustez: Valores por defecto si tipo es null
             $minAntes = $tipo ? ($tipo->minutos_antes_marcar ?? 15) : 15;
             $minCierre = $evento->minutos_cierre ?? ($tipo ? ($tipo->minutos_cierre ?? 60) : 60);
             $hrsSellar = $tipo ? ($tipo->horas_despues_sellar ?? 24) : 24;
 
-            // Ventana para MÚSICOS (desde App)
+            // Ventanas de tiempo
             $limiteInferior = $horaEvento->copy()->subMinutes($minAntes);
             $limiteSuperiorMarca = $horaEvento->copy()->addMinutes($minCierre);
-
-            // Ventana para AUDITORÍA (Sellar)
             $limiteSuperiorSello = $horaEvento->copy()->addHours($hrsSellar);
 
-            $ahora = Carbon::now('America/La_Paz');
             $puedeMarcar = ($ahora->greaterThanOrEqualTo($limiteInferior) && $ahora->lessThanOrEqualTo($limiteSuperiorMarca)) && !$evento->asistencia_cerrada;
             $estaSellado = $ahora->greaterThan($limiteSuperiorSello);
 
             $evento->puede_marcar_asistencia = $puedeMarcar;
             $evento->esta_sellado = $estaSellado;
+            // Use diffInMinutes directly
             $evento->minutos_para_inicio = $ahora->diffInMinutes($horaEvento, false);
             $evento->hora_servidor = $ahora->format('H:i:s');
-            $evento->limite_inferior = $limiteInferior->format('H:i:s');
-            $evento->limite_superior = $limiteSuperiorMarca->format('H:i:s');
+
+            // Only send if needed for debugging/UI, otherwise safe to omit for performance
+            // $evento->limite_inferior = $limiteInferior->format('H:i:s');
+            // $evento->limite_superior = $limiteSuperiorMarca->format('H:i:s');
 
             return $evento;
         });

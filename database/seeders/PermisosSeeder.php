@@ -55,7 +55,8 @@ class PermisosSeeder extends Seeder
             $miembro->permisos()->sync(Permiso::whereIn('permiso', [
                 'VER_DASHBOARD',
                 'GESTION_RECURSOS',
-                'GESTION_BIBLIOTECA'
+                'GESTION_BIBLIOTECA',
+                'ACCESO_WEB'
             ])->pluck('id_permiso'));
         }
     }

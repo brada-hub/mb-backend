@@ -112,40 +112,40 @@ class InitialCatalogSeeder extends Seeder
 
         // 4. CREACIÓN DE USUARIOS DE PRUEBA (Credenciales = Usuario)
 
-        // A. SUPER ADMIN (Dueño del SaaS - NO tiene miembro, NO pertenece a ninguna banda)
+        // A. SYSTEM ADMIN (Access to all bands if needed, but primarily platform management)
         User::updateOrCreate(
             ['user' => 'admin'],
             [
-                'password' => Hash::make('admin'),
-                'id_miembro' => null, // SuperAdmin NO tiene perfil de miembro
+                'password' => Hash::make('admin123'),
+                'id_miembro' => null,
                 'estado' => true,
                 'password_changed' => true,
-                'id_banda' => null, // NO pertenece a ninguna banda
+                'id_banda' => null,
                 'is_super_admin' => true
             ]
         );
 
-        // B. DIRECTOR (Dueño de su Banda)
+        // B. OFFICIAL DIRECTOR (JHOEL PONCE DE LEON) - Monster Band
         $directorMiembro = Miembro::firstOrCreate(
-            ['ci' => '1111111'],
+            ['ci' => '79991287'],
             [
                 'id_categoria' => $catA->id_categoria,
                 'id_seccion' => $trompetaSeccionId,
                 'id_instrumento' => $trompetaId,
                 'id_voz' => $v1->id_voz,
                 'id_rol' => $directorRole->id_rol,
-                'nombres' => 'DIRECTOR',
-                'apellidos' => 'BANDA',
-                'celular' => '71111111',
-                'direccion' => 'CENTRO',
+                'nombres' => 'JHOEL',
+                'apellidos' => 'PONCE DE LEON',
+                'celular' => '79991287',
+                'direccion' => 'ORURO',
                 'id_banda' => $banda->id_banda
             ]
         );
 
         User::updateOrCreate(
-            ['user' => 'director'],
+            ['user' => 'jhoel'],
             [
-                'password' => Hash::make('director'),
+                'password' => Hash::make('monster2026'),
                 'id_miembro' => $directorMiembro->id_miembro,
                 'estado' => true,
                 'password_changed' => true,
@@ -154,62 +154,7 @@ class InitialCatalogSeeder extends Seeder
             ]
         );
 
-        // C. JEFE DE SECCIÓN (Visualiza su instrumento)
-        $jefeMiembro = Miembro::firstOrCreate(
-            ['ci' => '2222222'],
-            [
-                'id_categoria' => $catB->id_categoria,
-                'id_seccion' => $trompetaSeccionId,
-                'id_instrumento' => $trompetaId,
-                'id_voz' => $v1->id_voz,
-                'id_rol' => $delegadoRole->id_rol,
-                'nombres' => 'JEFE',
-                'apellidos' => 'SECCIÓN',
-                'celular' => '72222222',
-                'direccion' => 'ZONA SUR',
-                'id_banda' => $banda->id_banda
-            ]
-        );
-
-        User::updateOrCreate(
-            ['user' => 'jefeseccion'],
-            [
-                'password' => Hash::make('jefeseccion'),
-                'id_miembro' => $jefeMiembro->id_miembro,
-                'estado' => true,
-                'password_changed' => true,
-                'id_banda' => $banda->id_banda,
-                'is_super_admin' => false
-            ]
-        );
-
-        // D. MIEMBRO (Solo visualiza su perfil/asistencia)
-        $miembroUserRecord = Miembro::firstOrCreate(
-            ['ci' => '3333333'],
-            [
-                'id_categoria' => $catC->id_categoria,
-                'id_seccion' => $trompetaSeccionId,
-                'id_instrumento' => $trompetaId,
-                'id_voz' => $v3->id_voz,
-                'id_rol' => $miembroRole->id_rol,
-                'nombres' => 'MÚSICO',
-                'apellidos' => 'BASE',
-                'celular' => '73333333',
-                'direccion' => 'ZONA NORTE',
-                'id_banda' => $banda->id_banda
-            ]
-        );
-
-        User::updateOrCreate(
-            ['user' => 'miembro'],
-            [
-                'password' => Hash::make('miembro'),
-                'id_miembro' => $miembroUserRecord->id_miembro,
-                'estado' => true,
-                'password_changed' => true,
-                'id_banda' => $banda->id_banda,
-                'is_super_admin' => false
-            ]
-        );
+        // C. Clean up demo users - In Production we don't need 'miembro' or 'jefeseccion' users by default
+        // They will be created manually by the Director.
     }
 }

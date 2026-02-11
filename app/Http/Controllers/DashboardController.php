@@ -70,31 +70,45 @@ class DashboardController extends Controller
         // 5. Heatmap Data (Restringido para Músicos/Jefes)
         $heatmapData = $this->getHeatmapData($isMusico, $user, $isJefe);
 
-        // 6. User Specific Data (Hoy + Próximos Confirmados)
+        // 6. User Specific Data (Hoy + Próximos Confirmados) - Optimized
         $misEventos = collect();
         if ($user->miembro) {
-            $misEventos = Evento::with('tipo')
-                ->where('fecha', '>=', Carbon::today()->toDateString())
+            $ahora = Carbon::now('America/La_Paz');
+            $todayStr = Carbon::today()->toDateString();
+
+            $misEventos = Evento::query()
+                ->with(['tipo', 'uniforme.items'])
+                ->with(['convocatorias' => function($q) use ($user) {
+                    $q->where('id_miembro', $user->miembro->id_miembro)
+                      ->with('asistencia');
+                }])
+                ->where('fecha', '>=', $todayStr)
                 ->whereHas('convocatorias', function($q) use ($user) {
                     $q->where('id_miembro', $user->miembro->id_miembro);
                 })
                 ->orderBy('fecha', 'asc')
                 ->orderBy('hora', 'asc')
                 ->get()
-                ->map(function($evento) use ($user) {
-                    $fechaStr = ($evento->fecha instanceof Carbon) ? $evento->fecha->format('Y-m-d') : $evento->fecha;
-                    $horaEvento = Carbon::parse($fechaStr . ' ' . $evento->hora, 'America/La_Paz');
-                    $ahora = Carbon::now('America/La_Paz');
+                ->map(function($evento) use ($user, $ahora, $todayStr) {
+                    $fechaBase = ($evento->fecha instanceof Carbon) ? $evento->fecha->format('Y-m-d') : substr($evento->fecha, 0, 10);
+                    $horaEvento = Carbon::parse($fechaBase . ' ' . $evento->hora, 'America/La_Paz');
 
                     $minAntes = $evento->tipo ? ($evento->tipo->minutos_antes_marcar ?? 15) : 15;
                     $minCierre = $evento->minutos_cierre ?? ($evento->tipo ? ($evento->tipo->minutos_cierre ?? 60) : 60);
 
-                    $evento->puede_marcar = $ahora->between($horaEvento->copy()->subMinutes($minAntes), $horaEvento->copy()->addMinutes($minCierre));
-                    $evento->es_hoy = Carbon::today()->toDateString() === $fechaStr;
+                    // Calculations in memory (faster)
+                    $inicioMarca = $horaEvento->copy()->subMinutes($minAntes);
+                    $finMarca = $horaEvento->copy()->addMinutes($minCierre);
 
-                    $evento->asistencia = Asistencia::whereHas('convocatoria', function($q) use ($evento, $user) {
-                        $q->where('id_evento', $evento->id_evento)->where('id_miembro', $user->miembro->id_miembro);
-                    })->first();
+                    $evento->puede_marcar = ($ahora->greaterThanOrEqualTo($inicioMarca) && $ahora->lessThanOrEqualTo($finMarca));
+                    $evento->es_hoy = $todayStr === $fechaBase;
+
+                    // Extract attendance from eager loaded relation
+                    $convocatoria = $evento->convocatorias->first();
+                    $evento->asistencia = $convocatoria ? $convocatoria->asistencia : null;
+
+                    // Clean up internal relation to reduce JSON size
+                    unset($evento->convocatorias);
 
                     return $evento;
                 });
@@ -157,20 +171,25 @@ class DashboardController extends Controller
                 'eventos' => [
                     'hoy' => $eventosHoy,
                     'proximos' => $proximosEventos,
-                    'pendientes_formacion' => $isMusico ? 0 : Evento::where('fecha', '>=', Carbon::today()->toDateString())
+                    'pendientes_formacion' => $isMusico ? 0 : Evento::where('fecha', '>=', $todayStr)
                         ->where('estado', true)
                         ->whereHas('requerimientos')
+                        ->with(['requerimientos'])
+                        ->withCount(['convocatorias as total_convocados'])
                         ->get()
                         ->filter(function($ev) use ($isJefe, $user) {
                             if ($isJefe) {
                                 $idInst = $user->miembro->id_instrumento;
                                 $req = $ev->requerimientos->where('id_instrumento', $idInst)->first();
                                 if (!$req) return false;
-                                return $ev->convocatorias()->whereHas('miembro', function($q) use ($idInst) {
-                                    $q->where('id_instrumento', $idInst);
-                                })->count() < $req->cantidad_necesaria;
+
+                                // Optimized: get count from relation count if already loaded or specific query
+                                $countSeccion = $ev->convocatorias()
+                                    ->whereHas('miembro', fn($q) => $q->where('id_instrumento', $idInst))
+                                    ->count();
+                                return $countSeccion < $req->cantidad_necesaria;
                             }
-                            return $ev->convocatorias->count() < $ev->requerimientos->sum('cantidad_necesaria');
+                            return $ev->total_convocados < $ev->requerimientos->sum('cantidad_necesaria');
                         })->count()
                 ],
                 'asistencia' => [
@@ -183,7 +202,7 @@ class DashboardController extends Controller
             'suscripcion' => $user->id_banda ? [
                 'plan' => $user->banda?->plan ?? 'BASIC',
                 'max_miembros' => $user->banda?->max_miembros ?? 15,
-                'uso_miembros' => Miembro::count(),
+                'uso_miembros' => \Illuminate\Support\Facades\Cache::remember("banda_{$user->id_banda}_miembros_count", 3600, fn() => Miembro::count()),
                 'pro_activo' => in_array(strtoupper($user->banda?->plan), ['PREMIUM', 'PRO', 'MONSTER'])
             ] : null,
             'heatmap' => $heatmapData,

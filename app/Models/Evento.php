@@ -30,7 +30,8 @@ class Evento extends Model
         'asistencia_cerrada',
         'remunerado',
         'monto_sugerido',
-        'id_banda'
+        'id_banda',
+        'uniforme_id'
     ];
 
     protected $casts = [
@@ -57,5 +58,10 @@ class Evento extends Model
     public function requerimientos()
     {
         return $this->hasMany(RequerimientoInstrumento::class, 'id_evento');
+    }
+
+    public function uniforme()
+    {
+        return $this->belongsTo(Uniforme::class, 'uniforme_id');
     }
 }

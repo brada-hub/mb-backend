@@ -22,9 +22,6 @@ class DatabaseSeeder extends Seeder
             PermisosSeeder::class,
             MusicLibrarySeeder::class,
             TipoEventoSeeder::class,
-            MiembrosSeeder::class,
-            EventosSeeder::class,
-            RealDemoDataSeeder::class,
         ]);
     }
 }

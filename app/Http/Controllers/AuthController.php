@@ -253,20 +253,26 @@ class AuthController extends Controller
         $user = auth()->user();
         if (!$user) return response()->json([], 401);
 
-        // Return all small catalogs
-        return response()->json([
-            'roles' => \App\Models\Rol::whereNotIn('rol', ['ADMIN', 'SUPER_ADMIN'])->get(),
-            'secciones' => \App\Models\Seccion::with('instrumentos')->get(),
-            'categorias' => \App\Models\Categoria::all(),
-            'permisos' => \App\Models\Permiso::all(),
-            'voces' => \App\Models\VozInstrumental::all(),
-            'suscripcion' => $user->id_banda ? [
-                'plan' => $user->banda?->plan ?? 'BASIC',
-                'max_miembros' => $user->banda?->max_miembros ?? 15,
-                'uso_miembros' => \App\Models\Miembro::count(), // Scoped by BelongsToBanda trait
-                'pro_activo' => in_array(strtoupper($user->banda?->plan), ['PREMIUM', 'PRO', 'MONSTER'])
-            ] : null,
-        ]);
+        $idBanda = $user->id_banda;
+
+        // Cache for 1 hour
+        $data = Cache::remember("master_data_banda_{$idBanda}", 3600, function() use ($user) {
+            return [
+                'roles' => \App\Models\Rol::whereNotIn('rol', ['ADMIN', 'SUPER_ADMIN'])->get(['id_rol', 'rol']),
+                'secciones' => \App\Models\Seccion::with('instrumentos:id_instrumento,id_seccion,instrumento')->get(['id_seccion', 'seccion']),
+                'categorias' => \App\Models\Categoria::get(['id_categoria', 'nombre_categoria']),
+                'permisos' => \App\Models\Permiso::get(['id_permiso', 'permiso']),
+                'voces' => \App\Models\VozInstrumental::all(['id_voz', 'nombre_voz']),
+                'suscripcion' => $user->id_banda ? [
+                    'plan' => $user->banda?->plan ?? 'BASIC',
+                    'max_miembros' => $user->banda?->max_miembros ?? 15,
+                    'uso_miembros' => \App\Models\Miembro::count(),
+                    'pro_activo' => in_array(strtoupper($user->banda?->plan ?? ''), ['PREMIUM', 'PRO', 'MONSTER'])
+                ] : null,
+            ];
+        });
+
+        return response()->json($data);
     }
 
     public function updatePreferences(Request $request)

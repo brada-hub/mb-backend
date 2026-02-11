@@ -21,8 +21,17 @@ class EventoController extends Controller
             $user->load('miembro');
         }
 
-        // 1. Obtener TODOS los eventos (Agenda Pública para toda la banda)
-        $eventos = Evento::with('tipo')
+        /**
+         * Optimización: Cargamos solo lo necesario para el calendario.
+         * Quitamos 'uniforme.items' que es muy pesado y solo se usa en el detalle (show).
+         * Limitamos columnas para reducir el tamaño del JSON.
+         */
+        $startYear = Carbon::now()->subYear()->startOfYear(); // Cargamos desde el inicio del año pasado
+
+        $eventos = Evento::query()
+                        ->select('id_evento', 'id_tipo_evento', 'evento', 'fecha', 'hora', 'direccion', 'latitud', 'longitud', 'estado', 'id_banda')
+                        ->with(['tipo:id_tipo_evento,evento']) // Solo el nombre del tipo
+                        ->where('fecha', '>=', $startYear)
                         ->orderBy('fecha', 'desc')
                         ->orderBy('hora', 'asc')
                         ->get();
@@ -30,14 +39,13 @@ class EventoController extends Controller
         // 2. Si es un usuario autenticado con miembro asociado, marcamos cuáles le tocan
         if ($user && $user->miembro) {
             // Obtenemos los IDs de eventos donde el miembro está convocado
-            $misEventosIds = \App\Models\ConvocatoriaEvento::where('id_miembro', $user->miembro->id_miembro)
+            $misEventosIds = ConvocatoriaEvento::where('id_miembro', $user->miembro->id_miembro)
                                 ->pluck('id_evento')
                                 ->toArray();
 
-            $eventos->transform(function($evento) use ($misEventosIds) {
+            $eventos->each(function($evento) use ($misEventosIds) {
                 // Forzar booleano para el frontend
                 $evento->estoy_convocado = in_array($evento->id_evento, $misEventosIds);
-                return $evento;
             });
         }
 
@@ -85,20 +93,29 @@ class EventoController extends Controller
     public function proximasConvocatorias() {
         $user = auth()->user();
         $miembro = $user->miembro;
-        $esJefe = $miembro && $miembro->rol?->rol === 'JEFE DE SECCIÓN';
+        $esJefe = $miembro && str_contains(strtoupper($miembro->rol?->rol ?? ''), 'JEFE');
         $miInstrumentoId = $miembro?->id_instrumento;
 
-        $eventos = Evento::with(['tipo', 'requerimientos.instrumento', 'convocatorias.miembro'])
+        $query = Evento::with(['tipo', 'requerimientos.instrumento'])
+            ->withCount('convocatorias')
+            ->withSum('requerimientos as total_necesario', 'cantidad_necesaria')
             ->where('fecha', '>=', now()->toDateString())
             ->where('estado', true)
             ->whereHas('requerimientos')
-            ->orderBy('fecha', 'asc')
-            ->get();
+            ->orderBy('fecha', 'asc');
+
+        if ($esJefe && $miInstrumentoId) {
+            $query->withCount(['convocatorias as convocados_seccion' => function($q) use ($miInstrumentoId) {
+                $q->whereHas('miembro', fn($m) => $m->where('id_instrumento', $miInstrumentoId));
+            }]);
+        }
+
+        $eventos = $query->get();
 
         // Calcular resumen para el frontend
-        $eventos->map(function($ev) use ($esJefe, $miInstrumentoId) {
-            $totalNecesario = $ev->requerimientos->sum('cantidad_necesaria');
-            $totalConvocado = $ev->convocatorias->count();
+        $eventos->each(function($ev) use ($esJefe, $miInstrumentoId) {
+            $totalNecesario = (int)$ev->total_necesario;
+            $totalConvocado = (int)$ev->convocatorias_count;
 
             $ev->meta_formacion = [
                 'total_necesario' => $totalNecesario,
@@ -111,9 +128,7 @@ class EventoController extends Controller
             if ($esJefe && $miInstrumentoId) {
                 $reqSeccion = $ev->requerimientos->where('id_instrumento', $miInstrumentoId)->first();
                 if ($reqSeccion) {
-                    $convocadosSeccion = $ev->convocatorias->filter(function($c) use ($miInstrumentoId) {
-                        return $c->miembro?->id_instrumento == $miInstrumentoId;
-                    })->count();
+                    $convocadosSeccion = (int)$ev->convocados_seccion;
 
                     $ev->mi_seccion_status = [
                         'instrumento' => $reqSeccion->instrumento?->instrumento,
@@ -123,9 +138,6 @@ class EventoController extends Controller
                     ];
                 }
             }
-
-            unset($ev->convocatorias); // Reducir payload
-            return $ev;
         });
 
         return $eventos;
@@ -152,6 +164,7 @@ class EventoController extends Controller
             'minutos_cierre' => 'nullable|integer|min:0',
             'remunerado' => 'nullable|boolean',
             'monto_sugerido' => 'nullable|numeric|min:0',
+            'uniforme_id' => 'nullable|exists:uniformes,id',
             'requerimientos' => 'nullable|array',
             'requerimientos.*.id_instrumento' => 'exists:instrumentos,id_instrumento',
             'requerimientos.*.cantidad_necesaria' => 'integer|min:1'
@@ -202,13 +215,13 @@ class EventoController extends Controller
                 }
             }
 
-            return $evento->load('tipo');
+            return $evento->load('tipo', 'uniforme');
         });
     }
 
     public function show($id)
     {
-        return Evento::with(['tipo', 'requerimientos.instrumento'])->findOrFail($id);
+        return Evento::with(['tipo', 'requerimientos.instrumento', 'uniforme.items'])->findOrFail($id);
     }
 
     public function update(Request $request, string $id)
@@ -243,6 +256,7 @@ class EventoController extends Controller
                 'minutos_cierre' => 'nullable|integer|min:0',
                 'remunerado' => 'nullable|boolean',
                 'monto_sugerido' => 'nullable|numeric|min:0',
+                'uniforme_id' => 'nullable|exists:uniformes,id',
                 'requerimientos' => 'nullable|array', // Validar array
                 'requerimientos.*.id_instrumento' => 'required|exists:instrumentos,id_instrumento',
                 'requerimientos.*.cantidad_necesaria' => 'required|integer|min:1',
@@ -270,7 +284,7 @@ class EventoController extends Controller
                 }
             }
 
-            return response()->json($evento->load('tipo', 'requerimientos'));
+            return response()->json($evento->load('tipo', 'requerimientos', 'uniforme.items'));
         });
     }
 

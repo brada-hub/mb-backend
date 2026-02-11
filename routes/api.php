@@ -16,20 +16,13 @@ use App\Http\Controllers\VozInstrumentalController;
 use App\Http\Controllers\MixController;
 use App\Http\Controllers\DashboardController;
 
-Route::get('/test-roles', function() { return response()->json(['status' => 'ok']); });
-Route::get('/test-push', function() {
-    $user = auth()->user();
-    if (!$user->fcm_token) return response()->json(['error' => 'No FCM token for user'], 400);
-    $sent = \App\Services\FCMService::enviarPush($user->fcm_token, "Prueba", "Esta es una notificación de prueba");
-    return response()->json(['sent' => $sent]);
-})->middleware('auth:sanctum');
+
 
 // Public Auth routes only (login, check-device)
 Route::post('/login', [AuthController::class, 'login']);
 Route::post('/check-device', [AuthController::class, 'checkDevice']);
 Route::get('/branding/{slug}', [\App\Http\Controllers\BandaController::class, 'getBranding']);
-Route::post('/cleanup-test-member', [MiembroController::class, 'cleanupTestMember']);
-Route::post('/cleanup-test-data', [SeccionController::class, 'cleanupTestData']);
+
 
 Route::middleware('auth:sanctum')->group(function () {
     Route::post('/logout', [AuthController::class, 'logout']);
@@ -106,6 +99,9 @@ Route::middleware('auth:sanctum')->group(function () {
     // Formaciones (Plantillas de Personal)
     Route::apiResource('formaciones', \App\Http\Controllers\FormacionController::class);
     Route::post('/formaciones/{id}/toggle-activo', [\App\Http\Controllers\FormacionController::class, 'toggleActivo']);
+
+    // Uniformes
+    Route::apiResource('uniformes', \App\Http\Controllers\UniformeController::class);
 
     // Eventos
     Route::get('/eventos/tipos', [EventoController::class, 'getTipos']);
