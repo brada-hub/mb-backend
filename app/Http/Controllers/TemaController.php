@@ -10,7 +10,8 @@ class TemaController extends Controller
     public function index(Request $request)
     {
         $user = $request->user();
-        $isMiembro = $user && $user->miembro && $user->miembro->rol && $user->miembro->rol->rol === 'MIEMBRO';
+        // Ajuste: El rol en BD es 'MÚSICO', no 'MIEMBRO'
+        $isMiembro = $user && $user->miembro && $user->miembro->rol && $user->miembro->rol->rol === 'MÚSICO';
         $instrumentoId = $isMiembro ? $user->miembro->id_instrumento : null;
 
         $query = Tema::with(['genero', 'videos', 'audio'])
