@@ -62,22 +62,29 @@ class MiembroController extends Controller
             }
         }
 
-        return \DB::transaction(function () use ($request) {
+        return \DB::transaction(function () use ($request, $user) {
             // 1. Create Miembro (Expediente)
-            $miembro = Miembro::create($request->only([
+            $data = $request->only([
                 'id_categoria', 'id_seccion', 'id_instrumento', 'id_voz', 'id_rol', 'nombres', 'apellidos',
                 'ci', 'celular', 'fecha', 'latitud', 'longitud', 'direccion', 'referencia_vivienda'
-            ]));
+            ]);
+
+            // Asignar banda al miembro (importante)
+            if ($user->id_banda) {
+                $data['id_banda'] = $user->id_banda;
+            }
+
+            $miembro = Miembro::create($data);
 
             // 2. Automatic User Generation Logic
-            // User requested: Username = CI, Password = CI
-            $generatedUsername = $request->ci;
-            $generatedPassword = $request->ci;
+            $generatedUsername = $request->ci; // Username = CI
+            $generatedPassword = $request->ci; // Password = CI
 
-            $user = User::create([
+            $newUser = User::create([
                 'user' => $generatedUsername,
                 'password' => \Hash::make($generatedPassword),
                 'id_miembro' => $miembro->id_miembro,
+                'id_banda' => $user->id_banda, // Vincular user a la banda
                 'estado' => true
             ]);
 
@@ -126,10 +133,13 @@ class MiembroController extends Controller
             'ci', 'celular', 'fecha', 'latitud', 'longitud', 'direccion', 'referencia_vivienda'
         ]));
 
-        // Manejar contacto de emergencia: solo si viene en el request
+        // Manejar contacto de emergencia
         if ($request->has('has_emergency_contact')) {
             $miembro->contactos()->delete();
-            if ($request->has_emergency_contact && $request->filled('contacto_nombre')) {
+            // Verifica si es booleano o string 'true'/'1'
+            $hasContact = filter_var($request->has_emergency_contact, FILTER_VALIDATE_BOOLEAN);
+
+            if ($hasContact && $request->filled('contacto_nombre')) {
                 $miembro->contactos()->create([
                     'nombres_apellidos' => $request->contacto_nombre,
                     'parentesco' => $request->contacto_parentesco,
