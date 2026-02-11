@@ -29,7 +29,7 @@ class InitialCatalogSeeder extends Seeder
             'estado' => true,
             'plan' => 'PRO',
             'id_plan' => $proPlan?->id_plan,
-            'max_miembros' => 100
+            'max_miembros' => 200
         ]);
 
         // 1. Roles (Asignados a la banda)

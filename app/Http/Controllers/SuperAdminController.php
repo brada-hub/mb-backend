@@ -70,7 +70,8 @@ class SuperAdminController extends Controller
                 'limite_alcanzado' => 0
             ];
 
-            // Storage (simplified)
+            // Storage report per band
+            $storage = $bandas->map(function($banda) {
                 $currentMb = $banda->getCurrentStorageMb();
                 $limitMb = $banda->subscriptionPlan->storage_mb ?? 100;
                 return [
@@ -83,6 +84,7 @@ class SuperAdminController extends Controller
                     'status' => $currentMb > $limitMb ? 'OVER_LIMIT' : ($currentMb > ($limitMb * 0.9) ? 'WARNING' : 'OK'),
                     'files_count' => Archivo::whereHas('recurso.tema', fn($q) => $q->where('id_banda', $banda->id_banda))->count()
                 ];
+            });
 
             return [
                 'stats' => $stats,
