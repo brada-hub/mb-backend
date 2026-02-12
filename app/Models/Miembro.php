@@ -30,6 +30,10 @@ class Miembro extends Model
         'id_banda'
     ];
 
+    protected $casts = [
+        'fecha' => 'datetime:Y/m/d',
+    ];
+
     public function user(): \Illuminate\Database\Eloquent\Relations\HasOne
     {
         return $this->hasOne(User::class, 'id_miembro');
