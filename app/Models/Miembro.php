@@ -31,7 +31,7 @@ class Miembro extends Model
     ];
 
     protected $casts = [
-        'fecha' => 'date:Y-m-d',
+        'fecha' => 'date:Y/m/d',
     ];
 
     public function user(): \Illuminate\Database\Eloquent\Relations\HasOne
