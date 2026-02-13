@@ -90,7 +90,7 @@ class UpdateMiembroRequest extends FormRequest
                 'sometimes',
                 'required',
                 'string',
-                'regex:/^[0-9]{5,10}(-[A-Z])?$/',
+                'regex:/^[0-9]{5,10}(-[A-Z0-9]{1,2})?$/',
                 Rule::unique('miembros', 'ci')->ignore($miembroId, 'id_miembro')
             ],
 

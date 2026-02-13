@@ -98,6 +98,10 @@ class AuthController extends Controller
         }
 
         // 3. Permissions Calculation (Early calculation for Gatekeeping)
+        if (!$user->miembro) {
+            return response()->json(['message' => 'Acceso denegado: El perfil de miembro asociado no existe.'], 403);
+        }
+
         $rolePerms = $user->miembro->rol->permisos->pluck('permiso')->toArray();
         $customPerms = $user->miembro->permisos->pluck('permiso')->toArray();
         $allPermissions = array_values(array_unique(array_merge($rolePerms, $customPerms)));

@@ -226,6 +226,7 @@ class DashboardController extends Controller
         $allAsistencias = DB::table('convocatoria_evento')
             ->join('eventos', 'convocatoria_evento.id_evento', '=', 'eventos.id_evento')
             ->leftJoin('asistencias', 'convocatoria_evento.id_convocatoria', '=', 'asistencias.id_convocatoria')
+            ->where('eventos.id_banda', $user->id_banda)
             ->where('eventos.fecha', '<', Carbon::today()->toDateString())
             ->select('convocatoria_evento.id_miembro', 'asistencias.estado', 'eventos.fecha')
             ->orderBy('eventos.fecha', 'desc')

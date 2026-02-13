@@ -126,34 +126,45 @@ class MiembroController extends Controller
      */
     public function update(UpdateMiembroRequest $request, string $id)
     {
-        $miembro = Miembro::findOrFail($id);
+        return \DB::transaction(function () use ($request, $id) {
+            $miembro = Miembro::with('user')->findOrFail($id);
 
-        $miembro->update($request->only([
-            'id_categoria', 'id_seccion', 'id_instrumento', 'id_voz', 'id_rol', 'nombres', 'apellidos',
-            'ci', 'celular', 'fecha', 'latitud', 'longitud', 'direccion', 'referencia_vivienda'
-        ]));
+            // Guardar CI original para ver si cambió
+            $oldCi = $miembro->ci;
 
-        // Manejar contacto de emergencia
-        if ($request->has('has_emergency_contact')) {
-            $miembro->contactos()->delete();
-            // Verifica si es booleano o string 'true'/'1'
-            $hasContact = filter_var($request->has_emergency_contact, FILTER_VALIDATE_BOOLEAN);
+            $miembro->update($request->only([
+                'id_categoria', 'id_seccion', 'id_instrumento', 'id_voz', 'id_rol', 'nombres', 'apellidos',
+                'ci', 'celular', 'fecha', 'latitud', 'longitud', 'direccion', 'referencia_vivienda'
+            ]));
 
-            if ($hasContact && $request->filled('contacto_nombre')) {
-                $miembro->contactos()->create([
-                    'nombres_apellidos' => $request->contacto_nombre,
-                    'parentesco' => $request->contacto_parentesco,
-                    'celular' => $request->contacto_celular
+            // Sincronizar usuario si el CI cambió
+            if ($miembro->user && $oldCi !== $miembro->ci) {
+                $miembro->user->update([
+                    'user' => $miembro->ci
                 ]);
             }
-        }
 
-        // Manejar permisos personalizados
-        if ($request->has('permisos')) {
-            $miembro->permisos()->sync($request->permisos);
-        }
+            // Manejar contacto de emergencia
+            if ($request->has('has_emergency_contact')) {
+                $miembro->contactos()->delete();
+                $hasContact = filter_var($request->has_emergency_contact, FILTER_VALIDATE_BOOLEAN);
 
-        return response()->json($miembro->load('user', 'contactos', 'seccion', 'categoria', 'rol.permisos', 'permisos'));
+                if ($hasContact && $request->filled('contacto_nombre')) {
+                    $miembro->contactos()->create([
+                        'nombres_apellidos' => $request->contacto_nombre,
+                        'parentesco' => $request->contacto_parentesco,
+                        'celular' => $request->contacto_celular
+                    ]);
+                }
+            }
+
+            // Manejar permisos personalizados
+            if ($request->has('permisos')) {
+                $miembro->permisos()->sync($request->permisos);
+            }
+
+            return response()->json($miembro->load('user', 'contactos', 'seccion', 'categoria', 'rol.permisos', 'permisos'));
+        });
     }
 
     /**
@@ -161,8 +172,18 @@ class MiembroController extends Controller
      */
     public function destroy(string $id)
     {
-        Miembro::destroy($id);
-        return response()->json(null, 204);
+        return \DB::transaction(function () use ($id) {
+            $miembro = Miembro::with('user')->findOrFail($id);
+
+            if ($miembro->user) {
+                // Opcional: Podrías querer revocar tokens antes de borrar
+                $miembro->user->tokens()->delete();
+                $miembro->user->delete();
+            }
+
+            $miembro->delete();
+            return response()->json(null, 204);
+        });
     }
 
     public function toggleStatus(string $id)
