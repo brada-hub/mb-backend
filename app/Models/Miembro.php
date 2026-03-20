@@ -26,6 +26,7 @@ class Miembro extends Model
         'id_instrumento',
         'id_voz',
         'id_rol',
+        'referencia_vivienda',
         'version_perfil',
         'id_banda'
     ];

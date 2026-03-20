@@ -241,8 +241,11 @@ class AsistenciaController extends Controller
         $hrsDespues = $tipo ? ($tipo->horas_despues_sellar ?? 24) : 24;
 
         if ($ahora->greaterThan($horaEvento->copy()->addHours($hrsDespues))) {
-            $role = auth()->user()->miembro->rol->rol ?? '';
-            if (strtoupper($role) !== 'ADMIN') {
+            $role = auth()->user()->miembro?->rol?->rol ?? '';
+            $esAdmin = strtoupper($role) === 'ADMIN' || auth()->user()->is_super_admin;
+            $esDirector = strtoupper($role) === 'DIRECTOR';
+
+            if (!$esAdmin && !$esDirector) {
                 return response()->json(['message' => 'Este registro ya está sellado por auditoría.'], 403);
             }
         }
@@ -268,10 +271,12 @@ class AsistenciaController extends Controller
             return response()->json(['message' => 'No tienes permisos para realizar marcados manuales.'], 403);
         }
 
-        // 2. Protección GPS Universal: Ni director ni jefes pueden cambiar un marcado GPS legal, solo ADMIN
+        // 2. Protección GPS Universal: 
         $asistenciaExistente = Asistencia::where('id_convocatoria', $request->id_convocatoria)->first();
-        if ($asistenciaExistente && $asistenciaExistente->latitud_marcado !== null && $role !== 'ADMIN') {
-            return response()->json(['message' => 'No puedes modificar una asistencia registrada legítimamente vía GPS.'], 403);
+        if ($asistenciaExistente && $asistenciaExistente->latitud_marcado !== null) {
+            if ($role !== 'ADMIN' && $role !== 'DIRECTOR') {
+                return response()->json(['message' => 'No puedes modificar una asistencia registrada legítimamente vía GPS.'], 403);
+            }
         }
 
         $fechaStr = ($evento->fecha instanceof Carbon) ? $evento->fecha->format('Y-m-d') : $evento->fecha;
@@ -460,13 +465,15 @@ class AsistenciaController extends Controller
                 cos($latFrom) * cos($latTo) * pow(sin($lonDelta / 2), 2)));
 
             $distancia = $angle * $earthRadius;
-            $radioMaximo = $evento->radio ?? 100;
+            $radioMaximo = ($evento->radio ?? 100);
+            $radioConTolerancia = $radioMaximo + 50; // Margen de error GPS de 50 metros
 
-            if ($distancia > $radioMaximo) {
+            if ($distancia > $radioConTolerancia) {
                 return response()->json([
-                    'message' => 'Estás demasiado lejos del punto de encuentro.',
-                    'distancia' => round($distancia, 2),
-                    'radio_permitido' => $radioMaximo
+                    'message' => 'Estás fuera del rango de marcación.',
+                    'distancia_actual' => round($distancia, 2) . 'm',
+                    'radio_configurado' => $radioMaximo . 'm',
+                    'nota' => 'Asegúrate de estar en el punto exacto y tener el GPS en alta precisión.'
                 ], 403);
             }
         }
@@ -545,4 +552,43 @@ class AsistenciaController extends Controller
 
         return response()->json(['synced_ids' => $results]);
     }
+
+    /**
+     * Sincroniza miembros que fueron registrados después de crear el evento.
+     * Solo para ADMIN o DIRECTOR.
+     */
+    public function sincronizarMiembros(Request $request)
+    {
+        $request->validate(['id_evento' => 'required|exists:eventos,id_evento']);
+        $user = auth()->user();
+        $role = strtoupper($user->miembro?->rol?->rol ?? '');
+        $esAdmin = $role === 'ADMIN' || $user->is_super_admin;
+        $esDirector = $role === 'DIRECTOR';
+
+        if (!$esAdmin && !$esDirector) {
+            return response()->json(['message' => 'No tienes permisos para sincronizar integrantes.'], 403);
+        }
+
+        $id_evento = $request->id_evento;
+        $miembrosExistentes = \App\Models\ConvocatoriaEvento::where('id_evento', $id_evento)->pluck('id_miembro')->toArray();
+        
+        // Obtener todos los miembros de la banda que no están en el evento
+        $nuevosMiembros = \App\Models\Miembro::whereNotIn('id_miembro', $miembrosExistentes)->get();
+        $count = 0;
+
+        foreach ($nuevosMiembros as $miembro) {
+            \App\Models\ConvocatoriaEvento::create([
+                'id_evento' => $id_evento,
+                'id_miembro' => $miembro->id_miembro,
+                'confirmado_por_director' => true // Auto-aceptado por ser admin sync
+            ]);
+            $count++;
+        }
+
+        return response()->json([
+            'message' => "Sincronización completada. Se añadieron {$count} integrantes nuevos al evento.",
+            'added_count' => $count
+        ]);
+    }
 }
+

@@ -132,10 +132,19 @@ class MiembroController extends Controller
             // Guardar CI original para ver si cambió
             $oldCi = $miembro->ci;
 
-            $miembro->update($request->only([
+            $data = $request->only([
                 'id_categoria', 'id_seccion', 'id_instrumento', 'id_voz', 'id_rol', 'nombres', 'apellidos',
                 'ci', 'celular', 'fecha', 'latitud', 'longitud', 'direccion', 'referencia_vivienda'
-            ]));
+            ]);
+
+            // Forzar nulos si vienen vacíos
+            foreach(['id_categoria', 'id_seccion', 'id_instrumento', 'id_voz', 'id_rol'] as $field) {
+                if ($request->has($field) && ($request->input($field) === '' || $request->input($field) === '0' || $request->input($field) === 'null')) {
+                    $data[$field] = null;
+                }
+            }
+
+            $miembro->update($data);
 
             // Sincronizar usuario si el CI cambió
             if ($miembro->user && $oldCi !== $miembro->ci) {
@@ -173,13 +182,17 @@ class MiembroController extends Controller
     public function destroy(string $id)
     {
         return \DB::transaction(function () use ($id) {
-            $miembro = Miembro::with('user')->findOrFail($id);
+            $miembro = Miembro::with(['user', 'convocatorias'])->findOrFail($id);
 
             if ($miembro->user) {
-                // Opcional: Podrías querer revocar tokens antes de borrar
+                // Revocar tokens y borrar usuario
                 $miembro->user->tokens()->delete();
                 $miembro->user->delete();
             }
+
+            // Las convocatorias y asistencias se borrarán por CASCADE en la DB,
+            // pero hacemos una limpieza explícita de convocatorias por si acaso.
+            $miembro->convocatorias()->delete();
 
             $miembro->delete();
             return response()->json(null, 204);

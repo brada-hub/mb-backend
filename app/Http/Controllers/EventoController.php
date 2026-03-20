@@ -233,13 +233,13 @@ class EventoController extends Controller
             // Check if event is locked (historical record) - dynamic margin
             $tipo = $evento->tipo;
             $hrsDespues = $tipo->horas_despues_sellar ?? 24;
-            $eventDateTime = Carbon::parse($evento->fecha . ' ' . $evento->hora);
+            $eventDateTime = $evento->fecha->copy()->setTimeFromTimeString($evento->hora);
             $isLocked = Carbon::now()->greaterThan($eventDateTime->addHours($hrsDespues));
 
             if ($isLocked) {
                 // God Mode check
-                $role = $user->miembro->rol->rol ?? '';
-                if (strtoupper($role) !== 'ADMIN') {
+                $role = $user->miembro?->rol?->rol ?? '';
+                if (strtoupper($role) !== 'ADMIN' && !$user->is_super_admin) {
                     return response()->json([
                         'message' => "Este evento ya es un registro histórico (más de {$hrsDespues}h) y está sellado para auditoría. Contacta a un Súper Admin si necesitas correcciones."
                     ], 403);
@@ -296,10 +296,10 @@ class EventoController extends Controller
         // Check lock for deletion
         $tipo = $evento->tipo;
         $hrsDespues = $tipo->horas_despues_sellar ?? 24;
-        $eventDateTime = Carbon::parse($evento->fecha . ' ' . $evento->hora);
+        $eventDateTime = $evento->fecha->copy()->setTimeFromTimeString($evento->hora);
         if (Carbon::now()->greaterThan($eventDateTime->addHours($hrsDespues))) {
-            $role = $user->miembro->rol->rol ?? '';
-            if (strtoupper($role) !== 'ADMIN') {
+            $role = $user->miembro?->rol?->rol ?? '';
+            if (strtoupper($role) !== 'ADMIN' && !$user->is_super_admin) {
                 return response()->json([
                     'message' => "No se pueden eliminar registros históricos (más de {$hrsDespues}h) de la agenda para mantener la integridad de las estadísticas."
                 ], 403);

@@ -76,6 +76,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/asistencia/marcar-masivo', [AsistenciaController::class, 'marcarMasivo']);
     Route::post('/asistencia/cerrar', [AsistenciaController::class, 'cerrarAsistencia']);
     Route::post('/asistencia/recordatorio', [AsistenciaController::class, 'enviarRecordatorios']);
+    Route::post('/asistencia/sincronizar-miembros', [AsistenciaController::class, 'sincronizarMiembros']);
 
     // Analytics Asistencia
     Route::get('/asistencias/stats', [\App\Http\Controllers\AsistenciaStatsController::class, 'globalStats']);
