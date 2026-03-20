@@ -4,76 +4,132 @@
     <meta charset="utf-8">
     <title>{{ $titulo }}</title>
     <style>
-        body { font-family: 'Helvetica', sans-serif; font-size: 10px; color: #333; }
-        .header { text-align: center; margin-bottom: 20px; border-bottom: 2px solid #bc1b1b; padding-bottom: 10px; }
-        .logo { max-width: 80px; margin-bottom: 10px; }
-        h1 { margin: 0; color: #bc1b1b; text-transform: uppercase; font-size: 18px; }
-        .banda-name { font-weight: bold; font-size: 14px; margin-bottom: 5px; }
-        .meta { font-size: 9px; color: #666; }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Helvetica', 'Arial', sans-serif; font-size: 10px; color: #333; }
         
-        table { width: 100%; border-collapse: collapse; margin-top: 10px; }
-        th { background-color: #f2f2f2; border: 1px solid #ddd; padding: 8px; text-align: left; text-transform: uppercase; font-size: 9px; }
-        td { border: 1px solid #ddd; padding: 6px; }
+        .header { text-align: center; margin-bottom: 15px; border-bottom: 3px solid #bc1b1b; padding-bottom: 10px; }
+        .logo { max-width: 70px; margin-bottom: 5px; }
+        .banda-name { font-weight: bold; font-size: 16px; text-transform: uppercase; letter-spacing: 2px; color: #333; }
+        h1 { margin: 5px 0 0; color: #bc1b1b; text-transform: uppercase; font-size: 14px; letter-spacing: 1px; }
+        .meta { font-size: 9px; color: #888; margin-top: 3px; }
         
-        .footer { position: fixed; bottom: 0; width: 100%; text-align: right; font-size: 8px; color: #999; border-top: 1px solid #eee; padding-top: 5px; }
+        .instrumento-header {
+            background-color: #bc1b1b;
+            color: white;
+            padding: 6px 12px;
+            font-size: 11px;
+            font-weight: bold;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            margin-top: 15px;
+            margin-bottom: 0;
+            border-radius: 4px 4px 0 0;
+        }
         
-        .badge { padding: 2px 5px; border-radius: 3px; font-weight: bold; font-size: 8px; color: white; }
-        .bg-red { background-color: #bc1b1b; }
-        .bg-green { background-color: #28a745; }
+        .tipo-badge {
+            display: inline-block;
+            background: rgba(255,255,255,0.2);
+            padding: 1px 6px;
+            border-radius: 8px;
+            font-size: 8px;
+            font-weight: bold;
+            margin-left: 6px;
+            letter-spacing: 1px;
+        }
+        
+        table { width: 100%; border-collapse: collapse; margin-bottom: 12px; }
+        th { 
+            background-color: #f5f5f5; 
+            border: 1px solid #ddd; 
+            padding: 6px 8px; 
+            text-align: left; 
+            text-transform: uppercase; 
+            font-size: 8px; 
+            letter-spacing: 1px;
+            color: #666;
+        }
+        td { border: 1px solid #ddd; padding: 5px 8px; font-size: 10px; }
+        tr:nth-child(even) { background-color: #fafafa; }
         
         .text-center { text-align: center; }
         .font-bold { font-weight: bold; }
+        
+        .total-badge {
+            display: inline-block;
+            background: rgba(255,255,255,0.2);
+            padding: 2px 8px;
+            border-radius: 10px;
+            font-size: 9px;
+            font-weight: bold;
+            margin-left: 8px;
+        }
+        
+        .footer { 
+            position: fixed; 
+            bottom: 10px; 
+            left: 0;
+            width: 100%; 
+            text-align: center; 
+            font-size: 8px; 
+            color: #aaa; 
+            border-top: 1px solid #eee; 
+            padding-top: 5px; 
+        }
     </style>
 </head>
 <body>
     <div class="header">
-        @if($banda && $banda->logo)
-            {{-- In a real environment we'd use base64 or absolute path --}}
-            <img src="{{ public_path(str_replace('/storage/', 'storage/', $banda->logo)) }}" class="logo">
+        @if(!empty($logoBase64))
+            <img src="{{ $logoBase64 }}" class="logo">
         @endif
-        <div class="banda-name">{{ $banda->nombre ?? 'Monster Band' }}</div>
+        <div class="banda-name">{{ $bandaNombre }}</div>
         <h1>{{ $titulo }}</h1>
-        <div class="meta">Generado el: {{ $fecha }}</div>
+        <div class="meta">Generado el: {{ $fecha }} &bull; Total: {{ $totalMiembros }} integrantes</div>
     </div>
 
-    <table>
-        <thead>
-            <tr>
-                <th width="5%">#</th>
-                <th width="25%">Nombres y Apellidos</th>
-                <th width="15%">CI</th>
-                <th width="12%">Celular</th>
-                <th width="20%">Instrumento / Rol</th>
-                <th width="15%">Sección</th>
-                <th width="8%" class="text-center">Estado</th>
-            </tr>
-        </thead>
-        <tbody>
-            @foreach($miembros as $index => $m)
-            <tr>
-                <td class="text-center">{{ $index + 1 }}</td>
-                <td class="font-bold">{{ $m->nombres }} {{ $m->apellidos }}</td>
-                <td>{{ $m->ci }}</td>
-                <td>{{ $m->celular }}</td>
-                <td>
-                    {{ $m->instrumento?->instrumento ?? 'N/A' }}<br>
-                    <small style="color: #bc1b1b">{{ $m->rol?->rol ?? 'Músico' }}</small>
-                </td>
-                <td>{{ $m->seccion?->seccion ?? 'N/A' }}</td>
-                <td class="text-center">
-                    @if($m->user && $m->user->estado)
-                        <span style="color: green">Activo</span>
-                    @else
-                        <span style="color: red">Inactivo</span>
+    @foreach($grupos as $grupo)
+        @php
+            $esPercusion = in_array(strtoupper($grupo['instrumento']), ['PLATILLO', 'TAMBOR', 'TIMBAL', 'BOMBO', 'PERCUSIÓN', 'PERCUSION', 'SIN INSTRUMENTO']);
+        @endphp
+
+        <div class="instrumento-header">
+            {{ $grupo['instrumento'] }}
+            <span class="total-badge">{{ count($grupo['miembros']) }}</span>
+            <span class="tipo-badge">{{ $esPercusion ? 'PERCUSIÓN' : 'VIENTOS' }}</span>
+        </div>
+
+        <table>
+            <thead>
+                <tr>
+                    <th width="5%">#</th>
+                    <th width="{{ $esPercusion ? '35%' : '25%' }}">Apellidos</th>
+                    <th width="{{ $esPercusion ? '35%' : '25%' }}">Nombres</th>
+                    <th width="{{ $esPercusion ? '25%' : '15%' }}">Instrumento</th>
+                    @if(!$esPercusion)
+                        <th width="15%">Tonalidad / Voz</th>
                     @endif
-                </td>
-            </tr>
-            @endforeach
-        </tbody>
-    </table>
+                    <th width="{{ $esPercusion ? '0%' : '15%' }}">Categoría</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach($grupo['miembros'] as $index => $m)
+                <tr>
+                    <td class="text-center">{{ $index + 1 }}</td>
+                    <td class="font-bold">{{ $m->apellidos }}</td>
+                    <td>{{ $m->nombres }}</td>
+                    <td>{{ $m->instrumento?->instrumento ?? '-' }}</td>
+                    @if(!$esPercusion)
+                        <td>{{ $m->voz?->nombre_voz ?? '-' }}</td>
+                    @endif
+                    <td>{{ $m->categoria?->nombre_categoria ?? '-' }}</td>
+                </tr>
+                @endforeach
+            </tbody>
+        </table>
+    @endforeach
 
     <div class="footer">
-        SIMBA - Sistema de Gestión de Bandas | {{ $fecha }} | Hoja 1
+        SIMBA &mdash; Sistema Integral de Gestión de Bandas | {{ $fecha }}
     </div>
 </body>
 </html>

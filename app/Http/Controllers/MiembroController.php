@@ -300,7 +300,7 @@ class MiembroController extends Controller
         $idSeccion = $request->input('id_seccion');
         $user = auth()->user();
         
-        $query = Miembro::with(['instrumento', 'seccion', 'rol', 'user'])
+        $query = Miembro::with(['instrumento', 'seccion', 'voz', 'categoria'])
             ->where('id_banda', $user->id_banda ?? 0);
 
         if ($idSeccion) {
@@ -310,14 +310,48 @@ class MiembroController extends Controller
         $miembros = $query->orderBy('apellidos')->get();
         $banda = \App\Models\Banda::find($user->id_banda);
         
+        // Logo en base64 para el PDF
+        $logoBase64 = null;
+        if ($banda && $banda->logo) {
+            $path = str_replace('/storage/', '', $banda->logo);
+            if (\Illuminate\Support\Facades\Storage::disk('public')->exists($path)) {
+                $file = \Illuminate\Support\Facades\Storage::disk('public')->get($path);
+                $type = \Illuminate\Support\Facades\Storage::disk('public')->mimeType($path);
+                $logoBase64 = 'data:' . $type . ';base64,' . base64_encode($file);
+            }
+        }
+
+        // Agrupar por instrumento con orden de banda
+        $orderMap = [
+            'PLATILLO' => 1, 'TAMBOR' => 2, 'TIMBAL' => 3, 'BOMBO' => 4,
+            'TROMBON' => 5, 'CLARINETE' => 6, 'BARITONO' => 7, 'TROMPETA' => 8, 'HELICON' => 9
+        ];
+
+        $grouped = $miembros->groupBy(fn($m) => $m->instrumento?->instrumento ?? 'Sin Instrumento');
+        
+        $sortedKeys = $grouped->keys()->sortBy(function($key) use ($orderMap) {
+            return $orderMap[strtoupper($key)] ?? 99;
+        });
+
+        $grupos = [];
+        foreach ($sortedKeys as $instrumento) {
+            $grupos[] = [
+                'instrumento' => $instrumento,
+                'miembros' => $grouped[$instrumento]->sortBy('apellidos')->values()
+            ];
+        }
+
         $data = [
-            'miembros' => $miembros,
-            'banda' => $banda,
+            'grupos' => $grupos,
+            'bandaNombre' => $banda?->nombre ?? 'Monster Band',
+            'logoBase64' => $logoBase64,
             'fecha' => now()->format('d/m/Y'),
+            'totalMiembros' => $miembros->count(),
             'titulo' => $idSeccion ? 'Lista de Personal - ' . ($miembros->first()?->seccion?->seccion ?? 'Sección') : 'Lista General de Personal'
         ];
 
         $pdf = \Barryvdh\DomPDF\Facade\Pdf::loadView('reports.miembros_lista', $data);
+        $pdf->setPaper('letter', 'portrait');
         
         $filename = 'Reporte_Personal_' . now()->format('Y-m-d') . '.pdf';
         return $pdf->download($filename);
