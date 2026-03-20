@@ -49,7 +49,15 @@ class AsistenciaController extends Controller
             $limiteSuperiorMarca = $horaEvento->copy()->addMinutes($minCierre);
             $limiteSuperiorSello = $horaEvento->copy()->addHours($hrsSellar);
 
-            $puedeMarcar = ($ahora->greaterThanOrEqualTo($limiteInferior) && $ahora->lessThanOrEqualTo($limiteSuperiorMarca)) && !$evento->asistencia_cerrada;
+            $puedeMarcar = (($ahora->greaterThanOrEqualTo($limiteInferior) && $ahora->lessThanOrEqualTo($limiteSuperiorMarca)) && !$evento->asistencia_cerrada);
+            
+            // Bypass para Admin/Director
+            $user = auth()->user();
+            $role = strtoupper($user->miembro->rol->rol ?? '');
+            if (in_array($role, ['ADMIN', 'DIRECTOR', 'ADMINISTRADOR'])) {
+                $puedeMarcar = true;
+            }
+
             $estaSellado = $ahora->greaterThan($limiteSuperiorSello);
 
             $evento->puede_marcar_asistencia = $puedeMarcar;
@@ -96,6 +104,13 @@ class AsistenciaController extends Controller
         $limiteSuperiorSello = $horaEvento->copy()->addHours($hrsSellar);
 
         $puedeMarcar = ($ahora->greaterThanOrEqualTo($limiteInferior) && $ahora->lessThanOrEqualTo($limiteSuperiorMarca)) && !$evento->asistencia_cerrada;
+
+        // Bypass para Admin/Director
+        $user = auth()->user();
+        $role = strtoupper($user->miembro->rol->rol ?? '');
+        if (in_array($role, ['ADMIN', 'DIRECTOR', 'ADMINISTRADOR'])) {
+            $puedeMarcar = true;
+        }
 
         // Obtener instrumentos únicos de los convocados para filtrado
         $instrumentos = $convocatorias->map(function($c) {

@@ -40,9 +40,16 @@ class AuthController extends Controller
                                                       ->first();
 
             if ($dispositivoAjeno) {
-                return response()->json([
-                    'message' => 'Este dispositivo ya está vinculado a otra cuenta. Contacta a soporte para liberarlo.'
-                ], 403);
+                // EXCEPCIÓN: Admins y Directores pueden entrar desde cualquier celular,
+                // incluso si ya está ligado a otro usuario (útil para desarrolladores o dueños de banda).
+                $role = strtoupper($user->miembro->rol->rol ?? '');
+                $isVip = in_array($role, ['ADMIN', 'DIRECTOR', 'ADMINISTRADOR']) || $user->isSuperAdmin();
+                
+                if (!$isVip) {
+                    return response()->json([
+                        'message' => 'Este dispositivo ya está vinculado a otra cuenta. Contacta a soporte para liberarlo.'
+                    ], 403);
+                }
             }
 
             // Verificar si este dispositivo ya está registrado para este usuario

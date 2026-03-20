@@ -42,6 +42,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/sync/master-data', [AuthController::class, 'syncMasterData']);
 
     // Miembros
+    Route::get('/miembros/reporte/pdf', [MiembroController::class, 'getReportePdf']);
     Route::apiResource('miembros', MiembroController::class);
     Route::apiResource('instrumentos', \App\Http\Controllers\InstrumentoController::class);
     Route::post('/miembros/{id}/toggle-status', [MiembroController::class, 'toggleStatus']);

@@ -294,4 +294,32 @@ class MiembroController extends Controller
             'whatsapp_url' => $whatsappUrl
         ]);
     }
+
+    public function getReportePdf(\Illuminate\Http\Request $request)
+    {
+        $idSeccion = $request->input('id_seccion');
+        $user = auth()->user();
+        
+        $query = Miembro::with(['instrumento', 'seccion', 'rol', 'user'])
+            ->where('id_banda', $user->id_banda ?? 0);
+
+        if ($idSeccion) {
+            $query->where('id_seccion', $idSeccion);
+        }
+
+        $miembros = $query->orderBy('apellidos')->get();
+        $banda = \App\Models\Banda::find($user->id_banda);
+        
+        $data = [
+            'miembros' => $miembros,
+            'banda' => $banda,
+            'fecha' => now()->format('d/m/Y'),
+            'titulo' => $idSeccion ? 'Lista de Personal - ' . ($miembros->first()?->seccion?->seccion ?? 'Sección') : 'Lista General de Personal'
+        ];
+
+        $pdf = \Barryvdh\DomPDF\Facade\Pdf::loadView('reports.miembros_lista', $data);
+        
+        $filename = 'Reporte_Personal_' . now()->format('Y-m-d') . '.pdf';
+        return $pdf->download($filename);
+    }
 }
