@@ -298,6 +298,7 @@ class MiembroController extends Controller
     public function getReportePdf(\Illuminate\Http\Request $request)
     {
         $idSeccion = $request->input('id_seccion');
+        $idInstrumento = $request->input('id_instrumento');
         $user = auth()->user();
         
         $query = Miembro::with(['instrumento', 'seccion', 'voz', 'categoria'])
@@ -305,6 +306,10 @@ class MiembroController extends Controller
 
         if ($idSeccion) {
             $query->where('id_seccion', $idSeccion);
+        }
+
+        if ($idInstrumento) {
+            $query->where('id_instrumento', $idInstrumento);
         }
 
         $miembros = $query->orderBy('apellidos')->get();

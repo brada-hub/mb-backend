@@ -27,7 +27,7 @@ class AsistenciaStatsController extends Controller
                 'eventos.fecha as date',
                 DB::raw("STRING_AGG(DISTINCT eventos.evento, ', ') as event_names"),
                 DB::raw('COUNT(convocatoria_evento.id_convocatoria) as total_convocados'),
-                DB::raw("SUM(CASE WHEN asistencias.estado IN ('PUNTUAL', 'RETRASO') THEN 1 ELSE 0 END) as total_presentes")
+                DB::raw("SUM(CASE WHEN asistencias.estado IN ('PUNTUAL', 'RETRASO', 'PRESENTE') THEN 1 ELSE 0 END) as total_presentes")
             )
             ->whereYear('eventos.fecha', $year)
             ->groupBy('eventos.fecha')
@@ -67,7 +67,7 @@ class AsistenciaStatsController extends Controller
             ->whereBetween('eventos.fecha', [$startOfMonth, $endOfMonth])
             ->select(
                 DB::raw("COUNT(*) as total"),
-                DB::raw("SUM(CASE WHEN asistencias.estado IN ('PUNTUAL', 'RETRASO') THEN 1 ELSE 0 END) as present")
+                DB::raw("SUM(CASE WHEN asistencias.estado IN ('PUNTUAL', 'RETRASO', 'PRESENTE') THEN 1 ELSE 0 END) as present")
             )
             ->first();
 
@@ -84,7 +84,7 @@ class AsistenciaStatsController extends Controller
             ->select(
                 'eventos.fecha',
                 DB::raw("COUNT(convocatoria_evento.id_convocatoria) as total"),
-                DB::raw("SUM(CASE WHEN asistencias.estado IN ('PUNTUAL', 'RETRASO') THEN 1 ELSE 0 END) as present")
+                DB::raw("SUM(CASE WHEN asistencias.estado IN ('PUNTUAL', 'RETRASO', 'PRESENTE') THEN 1 ELSE 0 END) as present")
             )
             ->groupBy('eventos.fecha')
             ->get()
@@ -161,7 +161,7 @@ class AsistenciaStatsController extends Controller
         }
 
         $totalEvents = $pastEvents->count();
-        $present = $pastEvents->whereIn('estado', ['PUNTUAL', 'RETRASO'])->count();
+        $present = $pastEvents->whereIn('estado', ['PUNTUAL', 'RETRASO', 'PRESENTE'])->count();
         $rate = $totalEvents > 0 ? round(($present / $totalEvents) * 100) : 0;
 
         return response()->json([
@@ -380,7 +380,7 @@ class AsistenciaStatsController extends Controller
         $stats = $statsQuery->select(
                 'convocatoria_evento.id_miembro',
                 DB::raw('COUNT(*) as total_events'),
-                DB::raw("SUM(CASE WHEN asistencias.estado IN ('PUNTUAL', 'RETRASO') THEN 1 ELSE 0 END) as present_count"),
+                DB::raw("SUM(CASE WHEN asistencias.estado IN ('PUNTUAL', 'RETRASO', 'PRESENTE') THEN 1 ELSE 0 END) as present_count"),
                 DB::raw("SUM(CASE WHEN asistencias.estado = 'FALTA' THEN 1 ELSE 0 END) as absent_count"),
                 DB::raw("SUM(CASE WHEN asistencias.estado = 'JUSTIFICADO' THEN 1 ELSE 0 END) as justified_count"),
                 DB::raw("SUM(CASE WHEN asistencias.estado IS NULL AND eventos.fecha < '" . date('Y-m-d') . "' THEN 1 ELSE 0 END) as unmarked_count")
@@ -489,7 +489,7 @@ class AsistenciaStatsController extends Controller
             $streak = 0;
 
             foreach ($records as $rec) {
-                if (in_array($rec->estado, ['PUNTUAL', 'RETRASO'])) {
+                if (in_array($rec->estado, ['PUNTUAL', 'RETRASO', 'PRESENTE'])) {
                     $streak++;
                 } else if ($rec->estado === 'FALTA' || is_null($rec->estado)) {
                     // Stop streak on absence

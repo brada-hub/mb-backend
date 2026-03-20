@@ -237,11 +237,11 @@ class EventoController extends Controller
             $isLocked = Carbon::now()->greaterThan($eventDateTime->addHours($hrsDespues));
 
             if ($isLocked) {
-                // God Mode check
+                // God Mode check - Admin y Director pueden editar eventos pasados
                 $role = $user->miembro?->rol?->rol ?? '';
-                if (strtoupper($role) !== 'ADMIN' && !$user->is_super_admin) {
+                if (strtoupper($role) !== 'ADMIN' && strtoupper($role) !== 'DIRECTOR' && !$user->is_super_admin) {
                     return response()->json([
-                        'message' => "Este evento ya es un registro histórico (más de {$hrsDespues}h) y está sellado para auditoría. Contacta a un Súper Admin si necesitas correcciones."
+                        'message' => "Este evento ya es un registro histórico (más de {$hrsDespues}h) y está sellado para auditoría. Contacta a un Administrador si necesitas correcciones."
                     ], 403);
                 }
             }
@@ -299,7 +299,7 @@ class EventoController extends Controller
         $eventDateTime = $evento->fecha->copy()->setTimeFromTimeString($evento->hora);
         if (Carbon::now()->greaterThan($eventDateTime->addHours($hrsDespues))) {
             $role = $user->miembro?->rol?->rol ?? '';
-            if (strtoupper($role) !== 'ADMIN' && !$user->is_super_admin) {
+            if (strtoupper($role) !== 'ADMIN' && strtoupper($role) !== 'DIRECTOR' && !$user->is_super_admin) {
                 return response()->json([
                     'message' => "No se pueden eliminar registros históricos (más de {$hrsDespues}h) de la agenda para mantener la integridad de las estadísticas."
                 ], 403);

@@ -102,13 +102,13 @@
             <thead>
                 <tr>
                     <th width="5%">#</th>
-                    <th width="{{ $esPercusion ? '35%' : '25%' }}">Apellidos</th>
-                    <th width="{{ $esPercusion ? '35%' : '25%' }}">Nombres</th>
-                    <th width="{{ $esPercusion ? '25%' : '15%' }}">Instrumento</th>
+                    <th width="{{ $esPercusion ? '30%' : '25%' }}">Apellidos</th>
+                    <th width="{{ $esPercusion ? '30%' : '25%' }}">Nombres</th>
+                    <th width="15%">Instrumento</th>
                     @if(!$esPercusion)
                         <th width="15%">Tonalidad / Voz</th>
                     @endif
-                    <th width="{{ $esPercusion ? '0%' : '15%' }}">Categoría</th>
+                    <th width="{{ $esPercusion ? '20%' : '10%' }}">Categoría</th>
                 </tr>
             </thead>
             <tbody>

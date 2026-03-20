@@ -101,7 +101,7 @@ class Miembro extends Model
 
         $streak = 0;
         foreach ($records as $rec) {
-            if (in_array($rec->estado, ['PUNTUAL', 'RETRASO'])) {
+            if (in_array($rec->estado, ['PUNTUAL', 'RETRASO', 'PRESENTE'])) {
                 $streak++;
             } else if ($rec->estado === 'FALTA' || is_null($rec->estado)) {
                 break;
