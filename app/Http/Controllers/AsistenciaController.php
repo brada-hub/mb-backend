@@ -18,15 +18,26 @@ class AsistenciaController extends Controller
     public function eventosHoy()
     {
         $hoy = Carbon::now('America/La_Paz')->toDateString();
+        $user = auth()->user();
+        $role = strtoupper($user->miembro->rol->rol ?? '');
+        $isAdminOrDirector = in_array($role, ['ADMIN', 'DIRECTOR', 'ADMINISTRADOR']) || !empty($user->is_super_admin);
 
-        // Optimized query: Only load 'tipo' and count of convocatorias
-        $eventos = Evento::with('tipo')
+        $query = Evento::with('tipo')
             ->withCount(['convocatorias' => function($q) {
                 $q->where('confirmado_por_director', true);
-            }])
-            ->whereDate('fecha', $hoy)
-            ->orderBy('hora')
-            ->get();
+            }]);
+
+        if ($isAdminOrDirector) {
+            $query->whereDate('fecha', '<=', $hoy)
+                  ->orderBy('fecha', 'desc')
+                  ->orderBy('hora', 'desc')
+                  ->limit(50); // limit to recent 50 to avoid massive payload
+        } else {
+            $query->whereDate('fecha', $hoy)
+                  ->orderBy('hora', 'asc');
+        }
+
+        $eventos = $query->get();
 
         // Agregar info de control de asistencia
         $ahora = Carbon::now('America/La_Paz');
@@ -54,7 +65,7 @@ class AsistenciaController extends Controller
             // Bypass para Admin/Director
             $user = auth()->user();
             $role = strtoupper($user->miembro->rol->rol ?? '');
-            if (in_array($role, ['ADMIN', 'DIRECTOR', 'ADMINISTRADOR'])) {
+            if (in_array($role, ['ADMIN', 'DIRECTOR', 'ADMINISTRADOR']) || !empty($user->is_super_admin)) {
                 $puedeMarcar = true;
             }
 
@@ -108,7 +119,7 @@ class AsistenciaController extends Controller
         // Bypass para Admin/Director
         $user = auth()->user();
         $role = strtoupper($user->miembro->rol->rol ?? '');
-        if (in_array($role, ['ADMIN', 'DIRECTOR', 'ADMINISTRADOR'])) {
+        if (in_array($role, ['ADMIN', 'DIRECTOR', 'ADMINISTRADOR']) || !empty($user->is_super_admin)) {
             $puedeMarcar = true;
         }
 
@@ -136,7 +147,7 @@ class AsistenciaController extends Controller
         $user = auth()->user();
         $role = strtoupper($user->miembro->rol->rol ?? '');
 
-        if ($role !== 'ADMIN' && $role !== 'DIRECTOR') {
+        if ($role !== 'ADMIN' && $role !== 'DIRECTOR' && empty($user->is_super_admin)) {
             return response()->json(['message' => 'Solo Admin/Director pueden cerrar asistencia.'], 403);
         }
 
@@ -289,7 +300,7 @@ class AsistenciaController extends Controller
         // 2. Protección GPS Universal: 
         $asistenciaExistente = Asistencia::where('id_convocatoria', $request->id_convocatoria)->first();
         if ($asistenciaExistente && $asistenciaExistente->latitud_marcado !== null) {
-            if ($role !== 'ADMIN' && $role !== 'DIRECTOR') {
+            if ($role !== 'ADMIN' && $role !== 'DIRECTOR' && empty($user->is_super_admin)) {
                 return response()->json(['message' => 'No puedes modificar una asistencia registrada legítimamente vía GPS.'], 403);
             }
         }
@@ -369,7 +380,7 @@ class AsistenciaController extends Controller
 
             // Restricción GPS: Ni director ni jefes pueden sobreescribir un marcado GPS legal
             $existente = Asistencia::where('id_convocatoria', $data['id_convocatoria'])->first();
-            if ($existente && $existente->latitud_marcado !== null && $miRole !== 'ADMIN') continue;
+            if ($existente && $existente->latitud_marcado !== null && $miRole !== 'ADMIN' && empty($user->is_super_admin)) continue;
 
             // Restricción Jefe: Solo su instrumento
             if (($miRole === 'JEFE DE SECCION' || str_contains($miRole, 'JEFE')) && $miRole !== 'ADMIN') {
